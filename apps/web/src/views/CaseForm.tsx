@@ -175,7 +175,7 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
     return (
       <section>
         {backButton}
-        <MessageBar intent="error">
+        <MessageBar layout="multiline" intent="error">
           <MessageBarBody>{(caseQuery.error as Error).message}</MessageBarBody>
         </MessageBar>
       </section>
@@ -198,7 +198,7 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
       {backButton}
 
       {lostAccess && (
-        <MessageBar intent="success" className={s.msg} data-testid="access-ended">
+        <MessageBar layout="multiline" intent="success" className={s.msg} data-testid="access-ended">
           <MessageBarBody>
             <MessageBarTitle>{ACTION_LABELS[lostAccess]} recorded in the audit trail.</MessageBarTitle>
             You no longer have access to this case
@@ -275,7 +275,7 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
       </Toolbar>
 
       {c.riskLevel === 'high' && !closed && (
-        <MessageBar intent="warning" className={s.msg}>
+        <MessageBar layout="multiline" intent="warning" className={s.msg}>
           <MessageBarBody>
             <MessageBarTitle>Four-eyes rule.</MessageBarTitle>
             High-risk approvals need a second sign-off from a different senior reviewer.
@@ -283,7 +283,7 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
         </MessageBar>
       )}
       {act.error && !dialog && (
-        <MessageBar intent="error" className={s.msg} data-testid="action-error">
+        <MessageBar layout="multiline" intent="error" className={s.msg} data-testid="action-error">
           <MessageBarBody>{(act.error as Error).message}</MessageBarBody>
         </MessageBar>
       )}
@@ -367,7 +367,7 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
           {lostAccess ? (
             <Text className={s.muted}>Audit history is hidden because you no longer have access to this case.</Text>
           ) : audit.error ? (
-            <MessageBar intent="error">
+            <MessageBar layout="multiline" intent="error">
               <MessageBarBody>{(audit.error as Error).message}</MessageBarBody>
             </MessageBar>
           ) : audit.isLoading ? (
@@ -539,12 +539,12 @@ function ActionDialog({
                 <Textarea value={note} onChange={(_, d) => setNote(d.value)} rows={3} resize="vertical" data-testid="note" />
               </Field>
               {firstOfTwo && (
-                <MessageBar intent="info">
+                <MessageBar layout="multiline" intent="info">
                   <MessageBarBody>This is a high-risk case: your approval is the first of two. A different senior reviewer must give the second.</MessageBarBody>
                 </MessageBar>
               )}
               {error && (
-                <MessageBar intent="error" data-testid="action-error">
+                <MessageBar layout="multiline" intent="error" data-testid="action-error">
                   <MessageBarBody>{error}</MessageBarBody>
                 </MessageBar>
               )}
@@ -592,7 +592,7 @@ function RevealDialog({
           <DialogBody>
             <DialogTitle>Reveal full SSN</DialogTitle>
             <DialogContent className={s.dialog}>
-              <MessageBar intent="warning">
+              <MessageBar layout="multiline" intent="warning">
                 <MessageBarBody>Reveals are logged with your name and justification and reviewed by compliance.</MessageBarBody>
               </MessageBar>
               <Field label="Justification" required>
@@ -605,7 +605,7 @@ function RevealDialog({
                 />
               </Field>
               {error && (
-                <MessageBar intent="error">
+                <MessageBar layout="multiline" intent="error">
                   <MessageBarBody>{error}</MessageBarBody>
                 </MessageBar>
               )}

@@ -44,14 +44,14 @@ export function App() {
     <AppShell me={me} users={users.data} view={view} onNavigate={navigate} onSwitchUser={switchUser} onSearch={onSearch}>
       {view.name === 'dashboard' ? (
         <Suspense fallback={<Spinner label="Loading dashboard…" />}>
-          <Dashboard me={me} users={users.data} onOpen={openCase} />
+          <Dashboard me={me} users={users.data} onOpen={openCase} onNavigate={navigate} />
         </Suspense>
       ) : view.name === 'grid' ? (
         <CaseGrid key={`${view.filter}:${search}`} me={me} users={users.data} filter={view.filter} initialSearch={search} onOpen={openCase} />
       ) : view.name === 'case' ? (
         <CaseForm key={view.id} me={me} users={users.data} id={view.id} onBack={() => navigate(view.from)} />
       ) : (
-        <AuditLog users={users.data} onOpenCase={openCase} />
+        <AuditLog key={`${view.action ?? ''}:${view.sinceDays ?? ''}`} users={users.data} initialAction={view.action} sinceDays={view.sinceDays} onOpenCase={openCase} />
       )}
     </AppShell>
   );

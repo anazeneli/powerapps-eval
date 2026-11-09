@@ -4,6 +4,7 @@ import {
   Badge,
   Card,
   CardHeader,
+  Link,
   MessageBar,
   MessageBarBody,
   Skeleton,
@@ -17,9 +18,10 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { DonutChart, VerticalStackedBarChart } from '@fluentui/react-charts';
-import { CASE_STATUSES, type KycCase, type KycStats, type User } from '@kyc/shared';
+import { CASE_STATUSES, can, type KycCase, type KycStats, type User } from '@kyc/shared';
 import { get } from '../api';
-import { RISK_COLORS, STATUS_COLORS, STATUS_LABELS, age, isClosed } from '../format';
+import { RISK_COLORS, STATUS_COLORS, STATUS_FILTERS, STATUS_LABELS, age, isClosed, type CaseFilter } from '../format';
+import type { View } from '../shell/AppShell';
 import { PageHeader } from './Page';
 
 const STATUS_HEX: Record<string, string> = {
@@ -36,6 +38,11 @@ const RISK_HEX = { low: '#107C10', medium: '#F2A900', high: '#C50F1F' };
 const useStyles = makeStyles({
   kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' },
   kpi: { padding: '14px 16px' },
+  clickable: {
+    cursor: 'pointer',
+    ':hover': { boxShadow: tokens.shadow8, outline: `1px solid ${tokens.colorBrandStroke2}` },
+  },
+  drill: { color: tokens.colorBrandForeground1, fontSize: tokens.fontSizeBase200, marginTop: '4px' },
   kpiLabel: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   kpiValue: { fontSize: '30px', lineHeight: '38px', fontWeight: tokens.fontWeightSemibold },
   kpiNote: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
@@ -66,13 +73,33 @@ function ChartBox({ height, children }: { height: number; children: (width: numb
   );
 }
 
-function Kpi({ label, value, note, alert }: { label: string; value: ReactNode; note?: string; alert?: boolean }) {
+function Kpi({
+  label,
+  value,
+  note,
+  alert,
+  onClick,
+}: {
+  label: string;
+  value: ReactNode;
+  note?: string;
+  alert?: boolean;
+  onClick?: () => void;
+}) {
   const s = useStyles();
   return (
-    <Card className={s.kpi}>
+    <Card
+      className={onClick ? `${s.kpi} ${s.clickable}` : s.kpi}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
+      aria-label={onClick ? `${label}: open the list` : undefined}
+    >
       <span className={s.kpiLabel}>{label}</span>
       <span className={`${s.kpiValue} ${alert ? s.alert : ''}`}>{value}</span>
       {note && <span className={s.kpiNote}>{note}</span>}
+      {onClick && <span className={s.drill}>View cases →</span>}
     </Card>
   );
 }
@@ -111,14 +138,24 @@ function CaseList({ cases, empty, onOpen }: { cases: KycCase[]; empty: string; o
   );
 }
 
-export default function Dashboard({ me, onOpen }: { me: User; users: User[]; onOpen: (id: string) => void }) {
+export default function Dashboard({
+  me,
+  onOpen,
+  onNavigate,
+}: {
+  me: User;
+  users: User[];
+  onOpen: (id: string) => void;
+  onNavigate: (v: View) => void;
+}) {
   const s = useStyles();
+  const show = (filter: CaseFilter) => () => onNavigate({ name: 'grid', filter });
   const stats = useQuery({ queryKey: ['stats', me.id], queryFn: () => get<KycStats>('/stats') });
   const cases = useQuery({ queryKey: ['cases', me.id, 'all'], queryFn: () => get<KycCase[]>('/cases?filter=all') });
 
   if (stats.error)
     return (
-      <MessageBar intent="error">
+      <MessageBar layout="multiline" intent="error">
         <MessageBarBody>{(stats.error as Error).message}</MessageBarBody>
       </MessageBar>
     );
@@ -145,8 +182,14 @@ export default function Dashboard({ me, onOpen }: { me: User; users: User[]; onO
     legend: STATUS_LABELS[k],
     data: st.byStatus[k],
     color: STATUS_HEX[k],
+    onClick: show(STATUS_FILTERS[k]),
   }));
-  const riskData = (['low', 'medium', 'high'] as const).map((k) => ({ legend: `${k[0].toUpperCase()}${k.slice(1)}`, data: st.byRisk[k], color: RISK_HEX[k] }));
+  const riskData = (['low', 'medium', 'high'] as const).map((k) => ({
+    legend: `${k[0].toUpperCase()}${k.slice(1)}`,
+    data: st.byRisk[k],
+    color: RISK_HEX[k],
+    onClick: show(`risk_${k}`),
+  }));
   const total = Object.values(st.byStatus).reduce((a, b) => a + b, 0);
   const decisions = st.decisionsByDay.map((d) => ({
     xAxisPoint: new Date(`${d.date}T12:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }),
@@ -160,20 +203,22 @@ export default function Dashboard({ me, onOpen }: { me: User; users: User[]; onO
     <section>
       <PageHeader title="KYC overview" subtitle="Contoso Financial · identity verification review · last 7 days" />
       {st.scope === 'visible' && (
-        <MessageBar intent="info" style={{ marginBottom: 12 }}>
+        <MessageBar layout="multiline" intent="info" style={{ marginBottom: 12 }}>
           <MessageBarBody>These numbers only cover cases you can access (row-level security applies to the dashboard too).</MessageBarBody>
         </MessageBar>
       )}
 
       <div className={s.kpis} data-testid="kpis">
-        <Kpi label="Open cases" value={st.open} note={`${total} total in scope`} />
-        <Kpi label="SLA breaches (>48h)" value={st.slaBreaches} note="Open cases past SLA" alert={st.slaBreaches > 0} />
-        <Kpi label="Decided (7 days)" value={st.decided7d} note={st.approvalRate === null ? 'No decisions yet' : `${st.approvalRate}% approved`} />
-        <Kpi label="Avg time to decision" value={st.avgHoursToDecision === null ? '—' : `${st.avgHoursToDecision}h`} note="Case opened → final decision" />
-        <Kpi label="Awaiting 2nd approval" value={st.awaitingSecond} note="High-risk, four-eyes rule" />
-        <Kpi label="Four-eyes approvals" value={st.fourEyesApprovals} note="Approved by two different reviewers" />
-        <Kpi label="SSN reveals (7 days)" value={st.ssnReveals7d} note="Each logged with a justification" />
-        <Kpi label="Escalated" value={st.byStatus.escalated} note="Waiting for a senior reviewer" />
+        <Kpi label="Open cases" value={st.open} note={`${total} total in scope`} onClick={show('open')} />
+        <Kpi label="SLA breaches (>48h)" value={st.slaBreaches} note="Open cases past SLA" alert={st.slaBreaches > 0} onClick={show('overdue')} />
+        <Kpi label="Decided (7 days)" value={st.decided7d} note={st.approvalRate === null ? 'No decisions yet' : `${st.approvalRate}% approved`} onClick={show('decided_7d')} />
+        <Kpi label="Avg time to decision" value={st.avgHoursToDecision === null ? '—' : `${st.avgHoursToDecision}h`} note="Case opened → final decision" onClick={show('decided_7d')} />
+        <Kpi label="Awaiting 2nd approval" value={st.awaitingSecond} note="High-risk, four-eyes rule" onClick={show('second_approval')} />
+        <Kpi label="Four-eyes approvals" value={st.fourEyesApprovals} note="Approved by two different reviewers" onClick={show('four_eyes')} />
+        <Kpi label="SSN reveals (7 days)" value={st.ssnReveals7d} note="Each logged with a justification"
+          onClick={can(me, 'audit.view_all').ok ? () => onNavigate({ name: 'audit', action: 'case.ssn_revealed', sinceDays: 7 }) : undefined}
+        />
+        <Kpi label="Escalated" value={st.byStatus.escalated} note="Waiting for a senior reviewer" onClick={show('escalated')} />
       </div>
 
       <div className={s.charts}>
@@ -190,7 +235,14 @@ export default function Dashboard({ me, onOpen }: { me: User; users: User[]; onO
           </ChartBox>
         </Card>
         <Card className={s.card}>
-          <CardHeader header={<Text weight="semibold">Decisions per day</Text>} />
+          <CardHeader
+            header={<Text weight="semibold">Decisions per day</Text>}
+            action={
+              <Link onClick={show('decided_7d')} className={s.drill}>
+                View decided cases →
+              </Link>
+            }
+          />
           <ChartBox height={260}>
             {(w) => <VerticalStackedBarChart key={w} data={decisions} width={w} height={260} yAxisTickCount={4} />}
           </ChartBox>
