@@ -73,7 +73,7 @@ export function seedKyc(db: DB, opts: { count?: number; now?: number } = {}): vo
       );
       const riskLevel: KycCase['riskLevel'] = score >= 60 ? 'high' : score >= 35 ? 'medium' : 'low';
       const created = now - Math.floor(rand() * 72 * 3600 * 1000);
-      const ssn = `${100 + Math.floor(rand() * 800)}-${10 + Math.floor(rand() * 89)}-${1000 + Math.floor(rand() * 8999)}`;
+      const ssn = `${900 + Math.floor(rand() * 100)}-${10 + Math.floor(rand() * 89)}-${1000 + Math.floor(rand() * 8999)}`;
       const year = 1955 + Math.floor(rand() * 50);
       const month = String(1 + Math.floor(rand() * 12)).padStart(2, '0');
       const day = String(1 + Math.floor(rand() * 28)).padStart(2, '0');
