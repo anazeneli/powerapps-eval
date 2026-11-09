@@ -1,39 +1,24 @@
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyRequest } from 'fastify';
-import { can, type Role, type User } from '@kyc/shared';
-import type { DB } from './db.js';
-import { listAudit, toCsv, verifyChain } from './audit.js';
-import { kycStats } from './stats.js';
-import {
-  CASE_ACTIONS,
-  CASE_FILTERS,
-  HttpError,
-  listCases,
-  performAction,
-  revealSsn,
-  viewCase,
-  type ActionInput,
-  type CaseActionName,
-  type CaseFilter,
-} from './kyc.js';
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    user: User;
-  }
-}
+import Fastify from 'fastify';
+import type { DB } from './platform/db.js';
+import { HttpError } from './platform/errors.js';
+import { loadUser } from './platform/auth.js';
+import { auditRoutes, platformRoutes } from './platform/routes.js';
+import { accessRoutes } from './platform/access.js';
+import { kycRoutes } from './apps/kyc/routes.js';
+import { refundRoutes } from './apps/refunds/routes.js';
+import { flagRoutes } from './apps/flags/routes.js';
 
 export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
   const app = Fastify({ logger: opts.logger ?? false, genReqId: () => randomUUID() });
 
-  const findUser = db.prepare('SELECT id, name, role FROM users WHERE id = ?');
-
   // Mock authentication: the UI's user switcher sends x-user-id. In production this is an
-  // Entra ID access token validated here, with app roles mapped to Role.
+  // Entra ID access token validated here, with Entra groups or app roles mapped to app_roles.
   app.addHook('preHandler', async (req) => {
-    if (req.url === '/api/users' || req.url === '/api/health') return;
+    const path = req.url.split('?')[0];
+    if (path === '/api/users' || path === '/api/health') return;
     const id = req.headers['x-user-id'];
-    const user = typeof id === 'string' ? (findUser.get(id) as { id: string; name: string; role: Role } | undefined) : undefined;
+    const user = typeof id === 'string' ? loadUser(db, id) : undefined;
     if (!user) throw new HttpError(401, 'Unknown or missing user (x-user-id)');
     req.user = user;
   });
@@ -46,72 +31,12 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
     return reply.status(500).send({ error: 'Internal error' });
   });
 
-  const requireAuditAccess = (req: FastifyRequest) => {
-    const d = can(req.user, 'audit.view_all');
-    if (!d.ok) throw new HttpError(403, d.reason);
-  };
-
-  app.get('/api/health', async () => ({ ok: true }));
-
-  app.get('/api/users', async () => db.prepare('SELECT id, name, role FROM users ORDER BY role, name').all());
-
-  app.get('/api/me', async (req) => req.user);
-
-  app.get<{ Querystring: { filter?: string } }>('/api/cases', async (req) => {
-    const filter = (req.query.filter ?? 'all') as CaseFilter;
-    if (!CASE_FILTERS.includes(filter)) throw new HttpError(400, `filter must be one of: ${CASE_FILTERS.join(', ')}`);
-    return listCases(db, req.user, filter);
-  });
-
-  app.get('/api/stats', async (req) => kycStats(db, req.user));
-
-  app.get<{ Params: { id: string } }>('/api/cases/:id', async (req) => viewCase(db, req.user, req.params.id, req.id));
-
-  app.post<{ Params: { id: string }; Body: { justification?: string } }>('/api/cases/:id/reveal-ssn', async (req) => ({
-    ssn: revealSsn(db, req.user, req.params.id, req.body?.justification ?? '', req.id),
-  }));
-
-  app.post<{ Params: { id: string; action: string }; Body: ActionInput }>('/api/cases/:id/actions/:action', async (req) => {
-    const action = req.params.action as CaseActionName;
-    if (!CASE_ACTIONS.includes(action)) throw new HttpError(404, `Unknown action ${req.params.action}`);
-    return performAction(db, req.user, req.params.id, action, req.body ?? {}, req.id);
-  });
-
-  app.get<{ Params: { id: string } }>('/api/cases/:id/audit', async (req) => {
-    viewableOrThrow(req.user, req.params.id);
-    return listAudit(db, { entityType: 'case', entityId: req.params.id });
-  });
-
-  app.get<{ Querystring: { limit?: string } }>('/api/audit', async (req) => {
-    requireAuditAccess(req);
-    return listAudit(db, { limit: Number(req.query.limit ?? 500) });
-  });
-
-  app.get('/api/audit/verify', async (req) => {
-    requireAuditAccess(req);
-    return verifyChain(db);
-  });
-
-  app.get('/api/audit.csv', async (req, reply) => {
-    requireAuditAccess(req);
-    return reply
-      .header('content-type', 'text/csv; charset=utf-8')
-      .header('content-disposition', 'attachment; filename="audit-log.csv"')
-      .send(toCsv(listAudit(db, { order: 'asc' })));
-  });
-
-  function viewableOrThrow(user: User, id: string) {
-    const row = db.prepare('SELECT status, assignee_id, first_approver_id FROM cases WHERE id = ?').get(id) as
-      | { status: string; assignee_id: string | null; first_approver_id: string | null }
-      | undefined;
-    if (!row) throw new HttpError(404, `Case ${id} not found`);
-    const d = can(user, 'case.view', {
-      status: row.status as never,
-      assigneeId: row.assignee_id,
-      firstApproverId: row.first_approver_id,
-    });
-    if (!d.ok) throw new HttpError(403, d.reason);
-  }
+  app.register(platformRoutes(db));
+  app.register(auditRoutes(db), { prefix: '/api/audit' });
+  app.register(accessRoutes(db), { prefix: '/api/access' });
+  app.register(kycRoutes(db), { prefix: '/api/kyc' });
+  app.register(refundRoutes(db), { prefix: '/api/refunds' });
+  app.register(flagRoutes(db), { prefix: '/api/flags' });
 
   return app;
 }

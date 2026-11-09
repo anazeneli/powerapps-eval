@@ -10,6 +10,7 @@ export interface Actor {
 export type Changes = Record<string, { from: unknown; to: unknown }>;
 
 export interface AuditInput {
+  appId: string;
   actor: Actor;
   action: string;
   entityType: string;
@@ -22,6 +23,7 @@ export interface AuditInput {
 interface AuditRow {
   id: number;
   at: string;
+  app_id: string;
   actor_id: string;
   actor_role: string;
   action: string;
@@ -39,6 +41,7 @@ const GENESIS = 'GENESIS';
 function computeHash(prevHash: string, r: Omit<AuditRow, 'id' | 'prev_hash' | 'hash'>): string {
   const canonical = JSON.stringify([
     r.at,
+    r.app_id,
     r.actor_id,
     r.actor_role,
     r.action,
@@ -59,6 +62,7 @@ export function appendAudit(db: DB, input: AuditInput): void {
   const prevHash = prev?.hash ?? GENESIS;
   const row = {
     at: new Date().toISOString(),
+    app_id: input.appId,
     actor_id: input.actor.id,
     actor_role: input.actor.role,
     action: input.action,
@@ -71,8 +75,8 @@ export function appendAudit(db: DB, input: AuditInput): void {
   const hash = computeHash(prevHash, row);
   const { lastInsertRowid } = db
     .prepare(
-      `INSERT INTO audit_events (at, actor_id, actor_role, action, entity_type, entity_id, changes, reason, request_id, prev_hash, hash)
-       VALUES (@at, @actor_id, @actor_role, @action, @entity_type, @entity_id, @changes, @reason, @request_id, @prev_hash, @hash)`,
+      `INSERT INTO audit_events (at, app_id, actor_id, actor_role, action, entity_type, entity_id, changes, reason, request_id, prev_hash, hash)
+       VALUES (@at, @app_id, @actor_id, @actor_role, @action, @entity_type, @entity_id, @changes, @reason, @request_id, @prev_hash, @hash)`,
     )
     .run({ ...row, prev_hash: prevHash, hash });
   db.prepare(
@@ -93,6 +97,7 @@ function toEvent(r: AuditRow): AuditEvent {
   return {
     id: r.id,
     at: r.at,
+    appId: r.app_id,
     actorId: r.actor_id,
     actorRole: r.actor_role,
     action: r.action,
@@ -107,10 +112,14 @@ function toEvent(r: AuditRow): AuditEvent {
 
 export function listAudit(
   db: DB,
-  filter: { entityType?: string; entityId?: string; limit?: number; order?: 'asc' | 'desc' } = {},
+  filter: { appId?: string; entityType?: string; entityId?: string; limit?: number; order?: 'asc' | 'desc' } = {},
 ): AuditEvent[] {
   const where: string[] = [];
   const params: Record<string, unknown> = { limit: filter.limit ?? -1 };
+  if (filter.appId) {
+    where.push('app_id = @appId');
+    params.appId = filter.appId;
+  }
   if (filter.entityType) {
     where.push('entity_type = @entityType');
     params.entityType = filter.entityType;
@@ -154,14 +163,14 @@ export function verifyChain(db: DB): ChainVerification {
 }
 
 export function toCsv(events: AuditEvent[]): string {
-  const header = ['id', 'at', 'actor_id', 'actor_role', 'action', 'entity_type', 'entity_id', 'changes', 'reason', 'request_id', 'hash'];
+  const header = ['id', 'at', 'app_id', 'actor_id', 'actor_role', 'action', 'entity_type', 'entity_id', 'changes', 'reason', 'request_id', 'hash'];
   const esc = (v: unknown) => {
     let s = v === null || v === undefined ? '' : typeof v === 'string' ? v : JSON.stringify(v);
     if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = events.map((e) =>
-    [e.id, e.at, e.actorId, e.actorRole, e.action, e.entityType, e.entityId, e.changes, e.reason, e.requestId, e.hash]
+    [e.id, e.at, e.appId, e.actorId, e.actorRole, e.action, e.entityType, e.entityId, e.changes, e.reason, e.requestId, e.hash]
       .map(esc)
       .join(','),
   );
