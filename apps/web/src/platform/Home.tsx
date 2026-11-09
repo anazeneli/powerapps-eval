@@ -13,7 +13,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { Home20Regular, LockClosed16Regular, Star20Filled, Star20Regular } from '@fluentui/react-icons';
+import { AppsAddIn24Regular, Home20Regular, LockClosed16Regular, Star20Filled, Star20Regular } from '@fluentui/react-icons';
 import { roleLabel, type AppSummary, type CatalogEntry } from '@kyc/shared';
 import { get } from '../api';
 import { AppShell } from '../shell/AppShell';
@@ -47,6 +47,15 @@ const useStyles = makeStyles({
   success: { color: tokens.colorPaletteGreenForeground1 },
   section: { margin: '0 0 12px' },
   locked: { padding: '14px 18px', minWidth: 0, opacity: 0.7 },
+  comingSoon: {
+    padding: '18px',
+    minWidth: 0,
+    cursor: 'default',
+    border: `1px dashed ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    boxShadow: 'none',
+    color: tokens.colorNeutralForeground3,
+  },
   lockLine: { display: 'flex', alignItems: 'center', gap: '6px', color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
 });
 
@@ -99,6 +108,25 @@ function Tile({ app, favorite, onToggleFavorite }: { app: CatalogEntry; favorite
   );
 }
 
+/** Placeholder for self-service app creation. Intentionally inert: it marks where the capability would live. */
+function BuildYourOwnTile() {
+  const s = useStyles();
+  return (
+    <Card className={s.comingSoon} aria-disabled="true" data-testid="tile-build-your-own">
+      <div className={s.tileTop}>
+        <div className={s.icon} style={{ background: tokens.colorNeutralForegroundDisabled }}>
+          <AppsAddIn24Regular />
+        </div>
+        <div className={s.name}>Build your own app</div>
+        <Badge appearance="tint" color="informative" className={s.star}>
+          Coming soon
+        </Badge>
+      </div>
+      <div className={s.desc}>Create a new internal app on the platform's shared access, audit and approvals.</div>
+    </Card>
+  );
+}
+
 /** Landing page: one tile per app the person has a role in, with live numbers. Others are listed as locked. */
 export function Home() {
   const s = useStyles();
@@ -127,6 +155,7 @@ export function Home() {
         {mine.map((a) => (
           <Tile key={a.id} app={a} favorite={favorites.includes(a.id)} onToggleFavorite={() => toggle(a.id)} />
         ))}
+        <BuildYourOwnTile />
       </div>
       {others.length > 0 && (
         <>
