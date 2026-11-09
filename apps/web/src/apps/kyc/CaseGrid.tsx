@@ -41,15 +41,15 @@ import type { Named } from '../../format';
 import { PageHeader, Surface } from '../../views/Page';
 
 const useStyles = makeStyles({
-  toolbar: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
-  search: { width: '300px' },
+  toolbar: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '8px' },
+  search: { width: '300px', maxWidth: '100%' },
   row: { cursor: 'pointer' },
   owner: { display: 'flex', alignItems: 'center', gap: '8px' },
   sla: { display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', paddingRight: '12px' },
   overdue: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
   muted: { color: tokens.colorNeutralForeground3 },
   empty: { padding: '32px', textAlign: 'center', color: tokens.colorNeutralForeground3 },
-  count: { color: tokens.colorNeutralForeground3, marginLeft: 'auto' },
+  count: { color: tokens.colorNeutralForeground3, marginLeft: 'auto', whiteSpace: 'nowrap' },
 });
 
 export function CaseGrid({
