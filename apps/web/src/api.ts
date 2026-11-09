@@ -40,6 +40,10 @@ export async function post<T>(path: string, body: unknown = {}): Promise<T> {
   return (await request(path, { method: 'POST', body: JSON.stringify(body) })).json();
 }
 
+export async function put<T>(path: string, body: unknown = {}): Promise<T> {
+  return (await request(path, { method: 'PUT', body: JSON.stringify(body) })).json();
+}
+
 export async function download(path: string, filename: string): Promise<void> {
   const blob = await (await request(path)).blob();
   const url = URL.createObjectURL(blob);

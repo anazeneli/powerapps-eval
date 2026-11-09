@@ -37,7 +37,7 @@ export const refundRoutes = (db: DB) => async (app: FastifyInstance) => {
     });
     return refunds.map((r) => ({ ...r, customerName: shortName(r.customerName) }));
   });
-  app.get('/charges', async () => listCharges(db));
+  app.get('/charges', async () => listCharges(db).map((c) => ({ ...c, customerName: shortName(c.customerName) })));
   app.get('/summary', async (req) => refundsSummary(db, me(req)));
   app.post<{ Body: CreateRefundInput }>('/', async (req) => createRefund(db, me(req), req.body ?? {}, req.id));
   app.get<{ Params: { id: string } }>('/:id', async (req) => getRefund(db, me(req), req.params.id));
