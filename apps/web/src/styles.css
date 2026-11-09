@@ -3,6 +3,6 @@ body { background: #f3f2f1; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .fui-Badge { white-space: nowrap; flex-shrink: 0; }
 .table-scroll { overflow-x: auto; }
-.table-scroll > .fui-Table, .table-scroll > .fui-DataGrid { min-width: 820px; }
+:where(.table-scroll > .fui-Table, .table-scroll > .fui-DataGrid) { min-width: 820px; }
 .table-scroll > table.fui-Table { table-layout: auto; }
 .table-scroll .fui-TableCell { overflow-wrap: normal; }

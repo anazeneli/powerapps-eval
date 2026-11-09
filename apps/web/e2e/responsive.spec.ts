@@ -20,8 +20,14 @@ async function layoutProblems(page: Page): Promise<string[]> {
       const cell = badge.closest('td, [role="gridcell"], [role="cell"]');
       if (cell && b.right > cell.getBoundingClientRect().right + 1) problems.push(`badge spills out of its cell: "${badge.innerText}"`);
     }
+    for (const control of document.querySelectorAll<HTMLElement>('main td button, main [role="gridcell"] button')) {
+      const c = control.getBoundingClientRect();
+      const cell = control.closest('td, [role="gridcell"]')!.getBoundingClientRect();
+      if (c.width > 0 && (c.right > cell.right + 1 || c.left < cell.left - 1)) problems.push(`button spills out of its cell: "${control.innerText}"`);
+    }
     for (const th of document.querySelectorAll<HTMLElement>('main th, main [role="columnheader"]')) {
-      if (th.getBoundingClientRect().width < 1) problems.push(`column collapsed: "${th.innerText}"`);
+      const w = th.getBoundingClientRect().width;
+      if (w < 40) problems.push(`column squeezed to ${Math.round(w)}px: "${th.innerText}"`);
     }
     return problems;
   });
