@@ -109,6 +109,7 @@ function CaseList({ cases, empty, onOpen }: { cases: KycCase[]; empty: string; o
   const s = useStyles();
   if (cases.length === 0) return <Text className={s.muted}>{empty}</Text>;
   return (
+    <div className="table-scroll">
     <Table size="small">
       <TableBody>
         {cases.map((c) => {
@@ -136,6 +137,7 @@ function CaseList({ cases, empty, onOpen }: { cases: KycCase[]; empty: string; o
         })}
       </TableBody>
     </Table>
+    </div>
   );
 }
 

@@ -34,7 +34,6 @@ const useStyles = makeStyles({
   count: { marginLeft: 'auto', color: tokens.colorNeutralForeground3 },
   muted: { color: tokens.colorNeutralForeground3 },
   msg: { marginBottom: '12px' },
-  scroll: { overflowX: 'auto' },
   table: { minWidth: '960px' },
   details: { display: 'flex', flexDirection: 'column', gap: '4px', overflowWrap: 'anywhere' },
 });
@@ -120,7 +119,7 @@ export function AuditLog({
             <MessageBarBody>{(audit.error as Error).message}</MessageBarBody>
           </MessageBar>
         ) : (
-          <div className={s.scroll}>
+          <div className="table-scroll">
           <Table size="small" className={s.table} data-testid="audit-table" aria-label="Audit events">
             <TableHeader>
               <TableRow>

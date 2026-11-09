@@ -185,6 +185,7 @@ export function CaseGrid({
         ) : rows.length === 0 ? (
           <div className={s.empty}>No cases in this view.</div>
         ) : (
+          <div className="table-scroll">
           <DataGrid
             items={rows}
             columns={columns}
@@ -213,6 +214,7 @@ export function CaseGrid({
               )}
             </DataGridBody>
           </DataGrid>
+          </div>
         )}
       </Surface>
     </section>

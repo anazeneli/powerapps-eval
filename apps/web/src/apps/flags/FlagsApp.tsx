@@ -44,6 +44,7 @@ export function FlagsApp() {
         <Surface className={s.section}>
           <div style={{ padding: 16 }}>
             <Text weight="semibold" block style={{ marginBottom: 8 }}>Production changes awaiting approval</Text>
+            <div className="table-scroll">
             <Table size="small" aria-label="Pending changes">
               <TableBody>
                 {awaiting.map((c) => {
@@ -63,12 +64,14 @@ export function FlagsApp() {
                 })}
               </TableBody>
             </Table>
+            </div>
             {decide.error && <MessageBar layout="multiline" intent="error"><MessageBarBody>{(decide.error as Error).message}</MessageBarBody></MessageBar>}
           </div>
         </Surface>
       )}
       {change.error && !pending && <MessageBar layout="multiline" intent="error" style={{ marginBottom: 12 }}><MessageBarBody>{(change.error as Error).message}</MessageBarBody></MessageBar>}
       <Surface>
+        <div className="table-scroll">
         <Table size="small" aria-label="Flags" data-testid="flags-table">
           <TableHeader>
             <TableRow>
@@ -96,6 +99,7 @@ export function FlagsApp() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Surface>
       {pending && (
         <Dialog open onOpenChange={(_, d) => !d.open && setPending(null)}>

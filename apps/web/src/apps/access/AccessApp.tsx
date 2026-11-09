@@ -32,6 +32,7 @@ export function AccessApp() {
         <Button appearance="primary" icon={<PersonAdd20Regular />} onClick={() => setAdding(true)} data-testid="add-person">Add person</Button>
       </PageHeader>
       <Surface>
+        <div className="table-scroll">
         <Table size="small" aria-label="People" data-testid="people-table">
           <TableHeader>
             <TableRow>
@@ -60,6 +61,7 @@ export function AccessApp() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Surface>
       {edit && <RoleDialog person={edit.person} appId={edit.appId} onClose={() => setEdit(null)} onDone={() => { setEdit(null); refresh(); }} />}
       {adding && <AddPersonDialog onClose={() => setAdding(false)} onDone={() => { setAdding(false); refresh(); }} />}
