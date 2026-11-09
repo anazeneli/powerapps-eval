@@ -17,6 +17,8 @@ export type CaseFilter =
   | 'escalated'
   | 'second_approval'
   | 'closed'
+  | 'approved'
+  | 'rejected'
   | 'open'
   | 'overdue'
   | 'decided_7d'
@@ -35,6 +37,8 @@ export const VIEW_LABELS: Record<CaseFilter, string> = {
   second_approval: 'Awaiting 2nd approval',
   closed: 'Closed',
   in_review: 'In review',
+  approved: 'Approved',
+  rejected: 'Rejected',
   open: 'Open cases',
   overdue: 'SLA breached (>48h)',
   decided_7d: 'Decided in the last 7 days',
@@ -50,8 +54,8 @@ export const STATUS_FILTERS: Record<CaseStatus, CaseFilter> = {
   pending_info: 'pending_info',
   escalated: 'escalated',
   pending_second_approval: 'second_approval',
-  approved: 'closed',
-  rejected: 'closed',
+  approved: 'approved',
+  rejected: 'rejected',
 };
 
 export const STATUS_LABELS: Record<CaseStatus, string> = {

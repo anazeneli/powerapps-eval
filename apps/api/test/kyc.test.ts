@@ -294,6 +294,9 @@ describe('dashboard drill-down filters', () => {
     expect((await list('four_eyes')).every((c) => c.secondApproverId)).toBe(true);
     expect((await list('decided_7d')).every((c) => closed(c.status))).toBe(true);
     expect((await list('in_review')).every((c) => c.status === 'in_review')).toBe(true);
+    expect(await list('approved')).toHaveLength(stats.byStatus.approved);
+    expect((await list('approved')).every((c) => c.status === 'approved')).toBe(true);
+    expect(await list('rejected')).toHaveLength(stats.byStatus.rejected);
     for (const r of ['low', 'medium', 'high']) {
       const cases = await list(`risk_${r}`);
       expect(cases).toHaveLength(stats.byRisk[r]);
@@ -308,7 +311,7 @@ describe('dashboard drill-down filters', () => {
 });
 
 describe('drill-down authorization', () => {
-  const FILTERS = ['all', 'new', 'mine', 'in_review', 'pending_info', 'escalated', 'second_approval', 'closed', 'open', 'overdue', 'decided_7d', 'four_eyes', 'risk_low', 'risk_medium', 'risk_high'];
+  const FILTERS = ['all', 'new', 'mine', 'in_review', 'approved', 'rejected', 'pending_info', 'escalated', 'second_approval', 'closed', 'open', 'overdue', 'decided_7d', 'four_eyes', 'risk_low', 'risk_medium', 'risk_high'];
   const auditCount = () => (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
 
   it('every filtered list, for every role, contains only cases that role may open', async () => {
@@ -360,5 +363,18 @@ describe('drill-down authorization', () => {
       }
     }
     expect((await app.inject({ method: 'GET', url: '/api/audit', headers: as('u-casey') })).statusCode).toBe(200);
+  });
+});
+
+describe('audit drill-down', () => {
+  it('returns every matching event in the window, matching the dashboard count', async () => {
+    const id = caseIdWhere("status = 'new'");
+    await action('u-sam', id, 'claim');
+    await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-sam'), payload: { justification: 'Check' } });
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const events = (await app.inject({ method: 'GET', url: `/api/audit?action=case.ssn_revealed&since=${encodeURIComponent(since)}`, headers: as('u-casey') })).json() as { action: string; at: string }[];
+    const stats = (await app.inject({ method: 'GET', url: '/api/stats', headers: as('u-casey') })).json();
+    expect(events).toHaveLength(stats.ssnReveals7d);
+    expect(events.every((e) => e.action === 'case.ssn_revealed' && e.at >= since)).toBe(true);
   });
 });

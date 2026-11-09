@@ -112,13 +112,21 @@ function toEvent(r: AuditRow): AuditEvent {
 
 export function listAudit(
   db: DB,
-  filter: { appId?: string; entityType?: string; entityId?: string; limit?: number; order?: 'asc' | 'desc' } = {},
+  filter: { appId?: string; entityType?: string; entityId?: string; action?: string; since?: string; limit?: number; order?: 'asc' | 'desc' } = {},
 ): AuditEvent[] {
   const where: string[] = [];
   const params: Record<string, unknown> = { limit: filter.limit ?? -1 };
   if (filter.appId) {
     where.push('app_id = @appId');
     params.appId = filter.appId;
+  }
+  if (filter.action) {
+    where.push('action = @action');
+    params.action = filter.action;
+  }
+  if (filter.since) {
+    where.push('at >= @since');
+    params.since = filter.since;
   }
   if (filter.entityType) {
     where.push('entity_type = @entityType');
