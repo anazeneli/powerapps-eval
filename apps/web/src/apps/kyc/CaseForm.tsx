@@ -56,9 +56,10 @@ import {
   type KycCase,
   type User,
 } from '@kyc/shared';
-import { get, post } from '../api';
-import { REASON_LABELS, RISK_COLORS, STATUS_COLORS, STATUS_LABELS, age, formatTime, isClosed, userName } from '../format';
-import { Timeline } from '../components/Timeline';
+import { get, post } from '../../api';
+import { REASON_LABELS, RISK_COLORS, STATUS_COLORS, STATUS_LABELS, age, formatTime, isClosed, userName } from '../../format';
+import type { Named } from '../../format';
+import { Timeline } from '../../components/Timeline';
 
 type CaseAction = 'claim' | 'request_info' | 'resume' | 'escalate' | 'approve' | 'reject';
 
@@ -118,7 +119,7 @@ const useStyles = makeStyles({
   msg: { marginBottom: '12px' },
 });
 
-export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; id: string; onBack: () => void }) {
+export function CaseForm({ me, users, id, onBack }: { me: User; users: Named[]; id: string; onBack: () => void }) {
   const s = useStyles();
   const queryClient = useQueryClient();
   const [lostAccess, setLostAccess] = useState<CaseAction | null>(null);
@@ -129,16 +130,16 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
   const timer = useRef<number>();
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const caseQuery = useQuery({ queryKey: ['case', me.id, id], queryFn: () => get<KycCase>(`/cases/${id}`), staleTime: Infinity, refetchOnMount: 'always' });
+  const caseQuery = useQuery({ queryKey: ['case', me.id, id], queryFn: () => get<KycCase>(`/kyc/cases/${id}`), staleTime: Infinity, refetchOnMount: 'always' });
   const audit = useQuery({
     queryKey: ['audit', me.id, id],
-    queryFn: () => get<AuditEvent[]>(`/cases/${id}/audit`),
+    queryFn: () => get<AuditEvent[]>(`/kyc/cases/${id}/audit`),
     enabled: !lostAccess,
   });
 
   const act = useMutation({
     mutationFn: (v: { action: CaseAction; note?: string; reasonCode?: string }) =>
-      post<KycCase>(`/cases/${id}/actions/${v.action}`, { note: v.note || undefined, reasonCode: v.reasonCode || undefined }),
+      post<KycCase>(`/kyc/cases/${id}/actions/${v.action}`, { note: v.note || undefined, reasonCode: v.reasonCode || undefined }),
     onSuccess: (updated, v) => {
       queryClient.setQueryData(['case', me.id, id], updated);
       if (!can(me, 'case.view', updated).ok) {
@@ -153,7 +154,7 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
   });
 
   const reveal = useMutation({
-    mutationFn: (justification: string) => post<{ ssn: string }>(`/cases/${id}/reveal-ssn`, { justification }),
+    mutationFn: (justification: string) => post<{ ssn: string }>(`/kyc/cases/${id}/reveal-ssn`, { justification }),
     onSuccess: ({ ssn }) => {
       setRevealed(ssn);
       setRevealOpen(false);
@@ -408,7 +409,7 @@ function HeaderField({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-function Person({ users, id, empty = '—' }: { users: User[]; id: string | null; empty?: string }) {
+function Person({ users, id, empty = '—' }: { users: Named[]; id: string | null; empty?: string }) {
   const s = useStyles();
   if (!id) return <Text className={s.muted}>{empty}</Text>;
   return (

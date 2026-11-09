@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'kyc.userId';
 
-let userId = localStorage.getItem(STORAGE_KEY) ?? 'u-alex';
+let userId = localStorage.getItem(STORAGE_KEY) ?? 'u-taylor';
 
 export function getUserId(): string {
   return userId;

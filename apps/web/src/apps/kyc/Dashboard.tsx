@@ -19,10 +19,11 @@ import {
 } from '@fluentui/react-components';
 import { DonutChart, VerticalStackedBarChart } from '@fluentui/react-charts';
 import { CASE_STATUSES, can, type KycCase, type KycStats, type User } from '@kyc/shared';
-import { get } from '../api';
-import { RISK_COLORS, STATUS_COLORS, STATUS_FILTERS, STATUS_LABELS, age, isClosed, type CaseFilter } from '../format';
-import type { View } from '../shell/AppShell';
-import { PageHeader } from './Page';
+import { get } from '../../api';
+import { RISK_COLORS, STATUS_COLORS, STATUS_FILTERS, STATUS_LABELS, age, isClosed, type CaseFilter } from '../../format';
+import type { Named } from '../../format';
+import type { KycView as View } from './KycApp';
+import { PageHeader } from '../../views/Page';
 
 const STATUS_HEX: Record<string, string> = {
   new: '#5690CF',
@@ -144,14 +145,14 @@ export default function Dashboard({
   onNavigate,
 }: {
   me: User;
-  users: User[];
+  users: Named[];
   onOpen: (id: string) => void;
   onNavigate: (v: View) => void;
 }) {
   const s = useStyles();
   const show = (filter: CaseFilter) => () => onNavigate({ name: 'grid', filter });
-  const stats = useQuery({ queryKey: ['stats', me.id], queryFn: () => get<KycStats>('/stats') });
-  const cases = useQuery({ queryKey: ['cases', me.id, 'all'], queryFn: () => get<KycCase[]>('/cases?filter=all') });
+  const stats = useQuery({ queryKey: ['stats', me.id], queryFn: () => get<KycStats>('/kyc/stats') });
+  const cases = useQuery({ queryKey: ['cases', me.id, 'all'], queryFn: () => get<KycCase[]>('/kyc/cases?filter=all') });
 
   if (stats.error)
     return (

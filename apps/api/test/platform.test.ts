@@ -108,6 +108,14 @@ describe('refunds', () => {
     expect((await create('u-jordan', 1_500, c)).statusCode).toBe(200);
   });
 
+  it('refund lists shorten names and log each load', async () => {
+    const before = (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
+    const list = (await get('u-sam', '/api/refunds')).json() as { customerName: string }[];
+    expect(list.every((r) => /^\S+( \S\.)?$/.test(r.customerName))).toBe(true);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n).toBe(before + 1);
+    expect(lastAudit()).toMatchObject({ app_id: 'refunds', action: 'refund.list_viewed', actor_id: 'u-sam' });
+  });
+
   it('agents only see their own requests; viewers cannot request', async () => {
     const mine = (await get('u-jordan', '/api/refunds')).json() as { requesterId: string }[];
     expect(mine.length).toBeGreaterThan(0);

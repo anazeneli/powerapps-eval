@@ -103,6 +103,13 @@ export interface AppSummary {
   metrics: { label: string; value: string | number; tone?: 'neutral' | 'warning' | 'danger' | 'success' }[];
 }
 
+/** Lists show just enough to triage: first name and last initial. Full details only on the (logged) record page. */
+export function shortName(full: string): string {
+  const [first, ...rest] = full.trim().split(/\s+/);
+  const last = rest.at(-1);
+  return last ? `${first} ${last[0]}.` : first;
+}
+
 export interface AuditEvent {
   id: number;
   at: string;

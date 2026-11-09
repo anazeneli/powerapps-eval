@@ -330,13 +330,19 @@ describe('drill-down authorization', () => {
     }
   });
 
-  it('listing does not leak SSNs or write audit rows; opening a case from a list is logged', async () => {
+  it('lists return no SSN, date of birth, country or full name, and each load writes one access event', async () => {
     const n = auditCount();
-    const body = (await app.inject({ method: 'GET', url: '/api/kyc/cases?filter=open', headers: as('u-sam') })).body;
-    expect(body).not.toMatch(/"ssn"|\d{3}-\d{2}-\d{4}/);
-    expect(auditCount()).toBe(n);
+    const res = await app.inject({ method: 'GET', url: '/api/kyc/cases?filter=open', headers: as('u-sam') });
+    const cases = res.json() as Record<string, unknown>[];
+    expect(res.body).not.toMatch(/"ssn|dateOfBirth|country|vendorChecks|\d{3}-\d{2}-\d{4}/);
+    for (const c of cases) expect(String(c.customerName)).toMatch(/^\S+( \S\.)?$/);
+    expect(auditCount()).toBe(n + 1);
+    const ev = db.prepare('SELECT * FROM audit_events ORDER BY id DESC LIMIT 1').get() as Record<string, string>;
+    expect(ev).toMatchObject({ app_id: 'kyc', action: 'case.list_viewed', actor_id: 'u-sam', entity_id: 'open' });
+    expect(JSON.parse(ev.changes).returned.to).toHaveLength(cases.length);
     const id = caseIdWhere("status = 'new'");
-    await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-sam') });
+    const full = (await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-sam') })).json();
+    expect(full.dateOfBirth).toBeTruthy();
     expect(auditFor(id).at(-1)).toMatchObject({ action: 'case.viewed', actor_id: 'u-sam' });
   });
 

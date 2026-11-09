@@ -4,7 +4,8 @@ import type { DB } from '../../platform/db.js';
 import { requireApp } from '../../platform/auth.js';
 import { HttpError } from '../../platform/errors.js';
 import { listAudit } from '../../platform/audit.js';
-import { can } from '@kyc/shared';
+import { can, shortName, type KycCaseListItem } from '@kyc/shared';
+import { appendAudit } from '../../platform/audit.js';
 import {
   CASE_ACTIONS,
   CASE_FILTERS,
@@ -25,7 +26,19 @@ export const kycRoutes = (db: DB) => async (app: FastifyInstance) => {
   app.get<{ Querystring: { filter?: string } }>('/cases', async (req) => {
     const filter = (req.query.filter ?? 'all') as CaseFilter;
     if (!CASE_FILTERS.includes(filter)) throw new HttpError(400, `filter must be one of: ${CASE_FILTERS.join(', ')}`);
-    return listCases(db, me(req), filter);
+    const cases = listCases(db, me(req), filter);
+    // Every list load is audited, so "who could have seen customer X" is answerable.
+    appendAudit(db, {
+      appId: 'kyc',
+      actor: me(req),
+      action: 'case.list_viewed',
+      entityType: 'case_list',
+      entityId: filter,
+      changes: { returned: { from: null, to: cases.map((c) => c.id) } },
+      reason: `filter=${filter}; ${cases.length} rows`,
+      requestId: req.id,
+    });
+    return cases.map(({ dateOfBirth, country, ssnMasked, vendorChecks, ...c }): KycCaseListItem => ({ ...c, customerName: shortName(c.customerName) }));
   });
 
   app.get('/stats', async (req) => kycStats(db, me(req)));

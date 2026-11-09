@@ -26,6 +26,9 @@ export interface VendorCheck {
   detail: string;
 }
 
+/** What queues and drill-downs return: no date of birth, country, SSN or vendor details; shortened name. */
+export type KycCaseListItem = Omit<KycCase, 'dateOfBirth' | 'country' | 'ssnMasked' | 'vendorChecks'>;
+
 export interface KycCase {
   id: string;
   customerName: string;

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import type { AppUser, RefundRole } from '@kyc/shared';
+import { shortName, type AppUser, type RefundRole } from '@kyc/shared';
+import { appendAudit } from '../../platform/audit.js';
 import type { DB } from '../../platform/db.js';
 import { requireApp } from '../../platform/auth.js';
 import { HttpError } from '../../platform/errors.js';
@@ -23,7 +24,18 @@ export const refundRoutes = (db: DB) => async (app: FastifyInstance) => {
   app.get<{ Querystring: { filter?: string } }>('/', async (req) => {
     const filter = (req.query.filter ?? 'all') as RefundFilter;
     if (!REFUND_FILTERS.includes(filter)) throw new HttpError(400, `filter must be one of: ${REFUND_FILTERS.join(', ')}`);
-    return listRefunds(db, me(req), filter);
+    const refunds = listRefunds(db, me(req), filter);
+    appendAudit(db, {
+      appId: 'refunds',
+      actor: me(req),
+      action: 'refund.list_viewed',
+      entityType: 'refund_list',
+      entityId: filter,
+      changes: { returned: { from: null, to: refunds.map((r) => r.id) } },
+      reason: `filter=${filter}; ${refunds.length} rows`,
+      requestId: req.id,
+    });
+    return refunds.map((r) => ({ ...r, customerName: shortName(r.customerName) }));
   });
   app.get('/charges', async () => listCharges(db));
   app.get('/summary', async (req) => refundsSummary(db, me(req)));

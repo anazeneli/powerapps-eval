@@ -25,7 +25,7 @@ import {
 } from '@fluentui/react-components';
 import { ArrowClockwise20Regular } from '@fluentui/react-icons';
 import { SLA_HOURS, type KycCase, type User } from '@kyc/shared';
-import { get } from '../api';
+import { get } from '../../api';
 import {
   RISK_COLORS,
   STATUS_COLORS,
@@ -36,8 +36,9 @@ import {
   statusOrder,
   userName,
   type CaseFilter,
-} from '../format';
-import { PageHeader, Surface } from './Page';
+} from '../../format';
+import type { Named } from '../../format';
+import { PageHeader, Surface } from '../../views/Page';
 
 const useStyles = makeStyles({
   toolbar: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
@@ -59,14 +60,14 @@ export function CaseGrid({
   onOpen,
 }: {
   me: User;
-  users: User[];
+  users: Named[];
   filter: CaseFilter;
   initialSearch: string;
   onOpen: (id: string) => void;
 }) {
   const s = useStyles();
   const [search, setSearch] = useState(initialSearch);
-  const cases = useQuery({ queryKey: ['cases', me.id, filter], queryFn: () => get<KycCase[]>(`/cases?filter=${filter}`) });
+  const cases = useQuery({ queryKey: ['cases', me.id, filter], queryFn: () => get<KycCase[]>(`/kyc/cases?filter=${filter}`) });
 
   const columns: TableColumnDefinition<KycCase>[] = useMemo(
     () => [
