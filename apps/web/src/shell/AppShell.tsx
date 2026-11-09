@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Avatar,
   Badge,
@@ -102,7 +102,9 @@ export function AppShell({
 }) {
   const s = useStyles();
   const { me, users, catalog, switchUser, openApp } = usePlatform();
-  const [navOpen, setNavOpen] = useState(true);
+  const narrow = useNarrow();
+  const [navOpen, setNavOpen] = useState(!narrow);
+  useEffect(() => setNavOpen(!narrow), [narrow]);
   const [query, setQuery] = useState('');
   const myApps = catalog.filter((a) => a.myRole);
   const subtitle = appId ? roleLabel(appId, me.roles[appId as keyof typeof me.roles]) : me.title;
@@ -183,7 +185,17 @@ export function AppShell({
         </div>
       </header>
       <div className={s.body}>
-        <NavDrawer open={navOpen} type="inline" className={s.nav} selectedValue={selected} onNavItemSelect={(_, d) => onSelect(String(d.value))}>
+        <NavDrawer
+          open={navOpen}
+          type={narrow ? 'overlay' : 'inline'}
+          onOpenChange={(_, d) => setNavOpen(d.open)}
+          className={s.nav}
+          selectedValue={selected}
+          onNavItemSelect={(_, d) => {
+            onSelect(String(d.value));
+            if (narrow) setNavOpen(false);
+          }}
+        >
           <NavDrawerBody>
             {nav.map((g, i) => (
               <div key={g.header ?? i}>
@@ -201,4 +213,17 @@ export function AppShell({
       </div>
     </div>
   );
+}
+
+const NARROW_QUERY = '(max-width: 1000px)';
+
+function useNarrow() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW_QUERY).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_QUERY);
+    const onChange = () => setNarrow(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
 }

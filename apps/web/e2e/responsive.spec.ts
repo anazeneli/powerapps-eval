@@ -10,6 +10,8 @@ async function layoutProblems(page: Page): Promise<string[]> {
     const problems: string[] = [];
     const doc = document.documentElement;
     if (doc.scrollWidth > window.innerWidth + 1) problems.push(`page scrolls sideways (${doc.scrollWidth}px > ${window.innerWidth}px)`);
+    const main = document.querySelector('main');
+    if (main && main.scrollWidth > main.clientWidth + 1) problems.push(`content spills sideways out of the page body (${main.scrollWidth}px > ${main.clientWidth}px)`);
     for (const badge of document.querySelectorAll<HTMLElement>('main .fui-Badge')) {
       if (badge.offsetParent === null) continue;
       const b = badge.getBoundingClientRect();
@@ -48,10 +50,16 @@ test('every app and the landing page lay out at all widths', async ({ page, requ
     await page.locator('main').waitFor();
     await page.waitForLoadState('networkidle');
 
-    for (const width of WIDTHS) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.waitForTimeout(300);
-      for (const p of await layoutProblems(page)) failures.push(`${app.id} @${width}px as ${user!.id}: ${p}`);
+    const views = await page.locator('.fui-NavItem').allInnerTexts();
+    for (const [i, view] of (views.length ? views : ['']).entries()) {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      if (view) await page.locator('.fui-NavItem').nth(i).click();
+      await page.waitForLoadState('networkidle');
+      for (const width of WIDTHS) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.waitForTimeout(300);
+        for (const p of await layoutProblems(page)) failures.push(`${app.id}${view ? ` › ${view}` : ''} @${width}px as ${user!.id}: ${p}`);
+      }
     }
   }
 
