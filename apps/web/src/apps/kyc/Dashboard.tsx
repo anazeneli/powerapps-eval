@@ -18,7 +18,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { DonutChart, VerticalStackedBarChart } from '@fluentui/react-charts';
-import { CASE_STATUSES, can, type KycCase, type KycStats, type User } from '@kyc/shared';
+import { CASE_STATUSES, type KycCaseListItem as KycCase, type KycStats, type User } from '@kyc/shared';
 import { get } from '../../api';
 import { RISK_COLORS, STATUS_COLORS, STATUS_FILTERS, STATUS_LABELS, age, isClosed, type CaseFilter } from '../../format';
 import type { Named } from '../../format';
@@ -143,11 +143,13 @@ export default function Dashboard({
   me,
   onOpen,
   onNavigate,
+  onOpenAudit,
 }: {
   me: User;
   users: Named[];
   onOpen: (id: string) => void;
   onNavigate: (v: View) => void;
+  onOpenAudit?: () => void;
 }) {
   const s = useStyles();
   const show = (filter: CaseFilter) => () => onNavigate({ name: 'grid', filter });
@@ -217,7 +219,7 @@ export default function Dashboard({
         <Kpi label="Awaiting 2nd approval" value={st.awaitingSecond} note="High-risk, four-eyes rule" onClick={show('second_approval')} />
         <Kpi label="Four-eyes approvals" value={st.fourEyesApprovals} note="Approved by two different reviewers" onClick={show('four_eyes')} />
         <Kpi label="SSN reveals (7 days)" value={st.ssnReveals7d} note="Each logged with a justification"
-          onClick={can(me, 'audit.view_all').ok ? () => onNavigate({ name: 'audit', action: 'case.ssn_revealed' }) : undefined}
+          onClick={onOpenAudit}
         />
         <Kpi label="Escalated" value={st.byStatus.escalated} note="Waiting for a senior reviewer" onClick={show('escalated')} />
       </div>

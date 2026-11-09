@@ -24,7 +24,7 @@ import {
   type TableColumnDefinition,
 } from '@fluentui/react-components';
 import { ArrowClockwise20Regular } from '@fluentui/react-icons';
-import { SLA_HOURS, type KycCase, type User } from '@kyc/shared';
+import { SLA_HOURS, type KycCaseListItem as KycCase, type User } from '@kyc/shared';
 import { get } from '../../api';
 import {
   RISK_COLORS,
@@ -83,7 +83,7 @@ export function CaseGrid({
         renderHeaderCell: () => 'Customer',
         renderCell: (c) => (
           <Text weight="semibold">
-            {c.customerName} <span className={s.muted}>· {c.country}</span>
+            {c.customerName}
           </Text>
         ),
       }),
