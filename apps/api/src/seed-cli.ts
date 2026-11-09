@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs';
 import { DB_FILE, ensureDataDir } from './config.js';
-import { openDb } from './db.js';
+import { openDb } from './platform/db.js';
 import { seed } from './seed.js';
 
 ensureDataDir();

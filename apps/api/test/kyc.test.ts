@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { openDb, type DB } from '../src/db.js';
+import { openDb, type DB } from '../src/platform/db.js';
 import { seed } from '../src/seed.js';
 import { buildApp } from '../src/app.js';
-import { verifyChain } from '../src/audit.js';
+import { verifyChain } from '../src/platform/audit.js';
 import { can, type KycCase, type User } from '@kyc/shared';
-import { USERS } from '../src/seed.js';
+import { PEOPLE } from '../src/seed.js';
+
+const USERS: User[] = PEOPLE.filter((p) => p.roles.kyc).map((p) => ({ id: p.id, name: p.name, role: p.roles.kyc as User['role'] }));
 import { APPROVE_REASON_CODES } from '@kyc/shared';
 
 let db: DB;
@@ -23,7 +25,7 @@ function auditFor(id: string) {
 }
 
 async function action(userId: string, id: string, name: string, body: object = {}) {
-  return app.inject({ method: 'POST', url: `/api/cases/${id}/actions/${name}`, headers: as(userId), payload: body });
+  return app.inject({ method: 'POST', url: `/api/kyc/cases/${id}/actions/${name}`, headers: as(userId), payload: body });
 }
 
 beforeEach(() => {
@@ -34,18 +36,18 @@ beforeEach(() => {
 
 describe('authentication and row-level access', () => {
   it('rejects requests without a known user', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/cases' });
+    const res = await app.inject({ method: 'GET', url: '/api/kyc/cases' });
     expect(res.statusCode).toBe(401);
   });
 
   it('analysts only see unassigned new cases and their own', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/cases', headers: as('u-alex') });
+    const res = await app.inject({ method: 'GET', url: '/api/kyc/cases', headers: as('u-alex') });
     const cases = res.json() as { status: string; assigneeId: string | null }[];
     expect(cases.length).toBeGreaterThan(0);
     for (const c of cases) expect(c.assigneeId === 'u-alex' || (c.status === 'new' && c.assigneeId === null)).toBe(true);
 
     const beasCase = caseIdWhere("assignee_id = 'u-bea'");
-    const denied = await app.inject({ method: 'GET', url: `/api/cases/${beasCase}`, headers: as('u-alex') });
+    const denied = await app.inject({ method: 'GET', url: `/api/kyc/cases/${beasCase}`, headers: as('u-alex') });
     expect(denied.statusCode).toBe(403);
   });
 
@@ -98,7 +100,7 @@ describe('audit trail', () => {
 
   it('logs case views', async () => {
     const id = caseIdWhere("status = 'new'");
-    await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-sam') });
+    await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-sam') });
     expect(auditFor(id).at(-1)).toMatchObject({ action: 'case.viewed', actor_id: 'u-sam' });
   });
 });
@@ -154,16 +156,16 @@ describe('SSN masking', () => {
     const id = caseIdWhere("status = 'new'");
     const { ssn } = db.prepare('SELECT ssn FROM cases WHERE id = ?').get(id) as { ssn: string };
 
-    const detail = await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-sam') });
+    const detail = await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-sam') });
     expect(detail.body).not.toContain(ssn);
     expect(detail.json().ssnMasked).toBe(`***-**-${ssn.slice(-4)}`);
 
-    const noReason = await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-sam'), payload: {} });
+    const noReason = await app.inject({ method: 'POST', url: `/api/kyc/cases/${id}/reveal-ssn`, headers: as('u-sam'), payload: {} });
     expect(noReason.statusCode).toBe(400);
 
     const ok = await app.inject({
       method: 'POST',
-      url: `/api/cases/${id}/reveal-ssn`,
+      url: `/api/kyc/cases/${id}/reveal-ssn`,
       headers: as('u-sam'),
       payload: { justification: 'Compare with document' },
     });
@@ -173,24 +175,24 @@ describe('SSN masking', () => {
 
   it('analysts cannot reveal SSNs on cases not assigned to them', async () => {
     const id = caseIdWhere("status = 'new'");
-    const res = await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-alex'), payload: { justification: 'x' } });
+    const res = await app.inject({ method: 'POST', url: `/api/kyc/cases/${id}/reveal-ssn`, headers: as('u-alex'), payload: { justification: 'x' } });
     expect(res.statusCode).toBe(403);
   });
 
   it('never writes the raw SSN into the audit log', async () => {
-    const csv = await app.inject({ method: 'GET', url: '/api/audit.csv', headers: as('u-casey') });
+    const csv = await app.inject({ method: 'GET', url: '/api/audit/export.csv', headers: as('u-casey') });
     const ssns = (db.prepare('SELECT ssn FROM cases').all() as { ssn: string }[]).map((r) => r.ssn);
     for (const s of ssns) expect(csv.body).not.toContain(s);
   });
 });
 
 describe('dashboard stats', () => {
-  const stats = async (userId: string) => (await app.inject({ method: 'GET', url: '/api/stats', headers: as(userId) })).json();
+  const stats = async (userId: string) => (await app.inject({ method: 'GET', url: '/api/kyc/stats', headers: as(userId) })).json();
 
   it('scopes numbers to the cases the caller can view', async () => {
     const all = await stats('u-sam');
     const alex = await stats('u-alex');
-    const visible = (await app.inject({ method: 'GET', url: '/api/cases', headers: as('u-alex') })).json() as unknown[];
+    const visible = (await app.inject({ method: 'GET', url: '/api/kyc/cases', headers: as('u-alex') })).json() as unknown[];
     expect(all.scope).toBe('all');
     expect(Object.values(all.byStatus as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(50);
     expect(alex.scope).toBe('visible');
@@ -200,7 +202,7 @@ describe('dashboard stats', () => {
   it('counts decisions, four-eyes approvals and reveals', async () => {
     const id = caseIdWhere("status = 'new' AND risk_level = 'high'");
     await action('u-alex', id, 'claim');
-    await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-alex'), payload: { justification: 'Check' } });
+    await app.inject({ method: 'POST', url: `/api/kyc/cases/${id}/reveal-ssn`, headers: as('u-alex'), payload: { justification: 'Check' } });
     await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' });
     const before = await stats('u-casey');
     await action('u-sam', id, 'approve', { reasonCode: 'docs_verified' });
@@ -222,7 +224,7 @@ describe('dashboard stats', () => {
 });
 
 describe('review findings', () => {
-  const csv = async () => (await app.inject({ method: 'GET', url: '/api/audit.csv', headers: as('u-casey') })).body;
+  const csv = async () => (await app.inject({ method: 'GET', url: '/api/audit/export.csv', headers: as('u-casey') })).body;
 
   it('rejects inherited object keys as reason codes', async () => {
     const id = caseIdWhere("status = 'new' AND risk_level = 'low'");
@@ -237,8 +239,8 @@ describe('review findings', () => {
     const id = caseIdWhere("status = 'new' AND risk_level = 'high'");
     await action('u-alex', id, 'claim');
     expect((await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' })).json().status).toBe('pending_second_approval');
-    expect((await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-alex') })).statusCode).toBe(403);
-    expect((await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-sam') })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-alex') })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-sam') })).statusCode).toBe(200);
   });
 
   it('exports the full audit log in ID order', async () => {
@@ -270,7 +272,7 @@ describe('review findings', () => {
 
 describe('dashboard drill-down filters', () => {
   const list = async (filter: string, userId = 'u-sam') =>
-    (await app.inject({ method: 'GET', url: `/api/cases?filter=${filter}`, headers: as(userId) })).json() as {
+    (await app.inject({ method: 'GET', url: `/api/kyc/cases?filter=${filter}`, headers: as(userId) })).json() as {
       status: string;
       riskLevel: string;
       createdAt: string;
@@ -279,7 +281,7 @@ describe('dashboard drill-down filters', () => {
   const closed = (s: string) => s === 'approved' || s === 'rejected';
 
   it('each KPI filter returns only matching cases and agrees with the stats', async () => {
-    const stats = (await app.inject({ method: 'GET', url: '/api/stats', headers: as('u-sam') })).json();
+    const stats = (await app.inject({ method: 'GET', url: '/api/kyc/stats', headers: as('u-sam') })).json();
     const open = await list('open');
     expect(open).toHaveLength(stats.open);
     expect(open.every((c) => !closed(c.status))).toBe(true);
@@ -303,7 +305,7 @@ describe('dashboard drill-down filters', () => {
   });
 
   it('drill-down lists still apply row-level access', async () => {
-    const stats = (await app.inject({ method: 'GET', url: '/api/stats', headers: as('u-alex') })).json();
+    const stats = (await app.inject({ method: 'GET', url: '/api/kyc/stats', headers: as('u-alex') })).json();
     expect(await list('open', 'u-alex')).toHaveLength(stats.open);
   });
 });
@@ -315,7 +317,7 @@ describe('drill-down authorization', () => {
   it('every filtered list, for every role, contains only cases that role may open', async () => {
     for (const user of USERS as User[]) {
       for (const filter of FILTERS) {
-        const res = await app.inject({ method: 'GET', url: `/api/cases?filter=${filter}`, headers: as(user.id) });
+        const res = await app.inject({ method: 'GET', url: `/api/kyc/cases?filter=${filter}`, headers: as(user.id) });
         expect(res.statusCode).toBe(200);
         for (const c of res.json() as KycCase[]) {
           expect(can(user, 'case.view', c).ok, `${user.id} saw ${c.id} via ${filter}`).toBe(true);
@@ -326,31 +328,37 @@ describe('drill-down authorization', () => {
 
   it('analysts never see another analyst\'s cases through any filter', async () => {
     for (const filter of FILTERS) {
-      const cases = (await app.inject({ method: 'GET', url: `/api/cases?filter=${filter}`, headers: as('u-alex') })).json() as KycCase[];
+      const cases = (await app.inject({ method: 'GET', url: `/api/kyc/cases?filter=${filter}`, headers: as('u-alex') })).json() as KycCase[];
       for (const c of cases) expect(c.assigneeId === 'u-alex' || (c.status === 'new' && c.assigneeId === null)).toBe(true);
     }
   });
 
-  it('listing does not leak SSNs or write audit rows; opening a case from a list is logged', async () => {
+  it('lists return no SSN, date of birth, country or full name, and each load writes one access event', async () => {
     const n = auditCount();
-    const body = (await app.inject({ method: 'GET', url: '/api/cases?filter=open', headers: as('u-sam') })).body;
-    expect(body).not.toMatch(/"ssn"|\d{3}-\d{2}-\d{4}/);
-    expect(auditCount()).toBe(n);
+    const res = await app.inject({ method: 'GET', url: '/api/kyc/cases?filter=open', headers: as('u-sam') });
+    const cases = res.json() as Record<string, unknown>[];
+    expect(res.body).not.toMatch(/"ssn|dateOfBirth|country|vendorChecks|\d{3}-\d{2}-\d{4}/);
+    for (const c of cases) expect(String(c.customerName)).toMatch(/^\S+( \S\.)?$/);
+    expect(auditCount()).toBe(n + 1);
+    const ev = db.prepare('SELECT * FROM audit_events ORDER BY id DESC LIMIT 1').get() as Record<string, string>;
+    expect(ev).toMatchObject({ app_id: 'kyc', action: 'case.list_viewed', actor_id: 'u-sam', entity_id: 'open' });
+    expect(JSON.parse(ev.changes).returned.to).toHaveLength(cases.length);
     const id = caseIdWhere("status = 'new'");
-    await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-sam') });
+    const full = (await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-sam') })).json();
+    expect(full.dateOfBirth).toBeTruthy();
     expect(auditFor(id).at(-1)).toMatchObject({ action: 'case.viewed', actor_id: 'u-sam' });
   });
 
   it('a denied case open returns 403 and writes nothing', async () => {
     const beas = caseIdWhere("assignee_id = 'u-bea'");
     const n = auditCount();
-    expect((await app.inject({ method: 'GET', url: `/api/cases/${beas}`, headers: as('u-alex') })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/api/kyc/cases/${beas}`, headers: as('u-alex') })).statusCode).toBe(403);
     expect(auditCount()).toBe(n);
   });
 
   it('the SSN-reveal drill-down target (audit log) is compliance-admin only, on every audit endpoint', async () => {
     for (const userId of ['u-alex', 'u-bea', 'u-sam', 'u-riley']) {
-      for (const url of ['/api/audit', '/api/audit/verify', '/api/audit.csv']) {
+      for (const url of ['/api/audit', '/api/audit/verify', '/api/audit/export.csv']) {
         expect((await app.inject({ method: 'GET', url, headers: as(userId) })).statusCode, `${userId} ${url}`).toBe(403);
       }
     }
@@ -362,10 +370,10 @@ describe('audit drill-down', () => {
   it('returns every matching event in the window, matching the dashboard count', async () => {
     const id = caseIdWhere("status = 'new'");
     await action('u-sam', id, 'claim');
-    await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-sam'), payload: { justification: 'Check' } });
+    await app.inject({ method: 'POST', url: `/api/kyc/cases/${id}/reveal-ssn`, headers: as('u-sam'), payload: { justification: 'Check' } });
     const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
     const events = (await app.inject({ method: 'GET', url: `/api/audit?action=case.ssn_revealed&since=${encodeURIComponent(since)}`, headers: as('u-casey') })).json() as { action: string; at: string }[];
-    const stats = (await app.inject({ method: 'GET', url: '/api/stats', headers: as('u-casey') })).json();
+    const stats = (await app.inject({ method: 'GET', url: '/api/kyc/stats', headers: as('u-casey') })).json();
     expect(events).toHaveLength(stats.ssnReveals7d);
     expect(events.every((e) => e.action === 'case.ssn_revealed' && e.at >= since)).toBe(true);
   });

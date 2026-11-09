@@ -1,5 +1,5 @@
 import { CASE_STATUSES, SLA_HOURS, type KycStats, type User } from '@kyc/shared';
-import type { DB } from './db.js';
+import type { DB } from '../../platform/db.js';
 import { listCases } from './kyc.js';
 
 const HOUR = 3_600_000;

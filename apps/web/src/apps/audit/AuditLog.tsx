@@ -21,11 +21,12 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { ArrowDownload20Regular, ShieldCheckmark20Regular } from '@fluentui/react-icons';
-import type { AuditEvent, User } from '@kyc/shared';
-import { download, get } from '../api';
-import { ROLE_LABELS, auditActionLabel, formatTime, userName } from '../format';
-import { ActorAvatar, ChangeList } from '../components/Timeline';
-import { PageHeader, Surface } from './Page';
+import { APPS, type AuditEvent } from '@kyc/shared';
+import type { Named } from '../../format';
+import { download, get } from '../../api';
+import { ROLE_LABELS, auditActionLabel, formatTime, userName } from '../../format';
+import { ActorAvatar, ChangeList } from '../../components/Timeline';
+import { PageHeader, Surface } from '../../views/Page';
 
 const useStyles = makeStyles({
   toolbar: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' },
@@ -38,20 +39,17 @@ const useStyles = makeStyles({
 export function AuditLog({
   users,
   initialAction,
-  sinceDays,
   onOpenCase,
 }: {
-  users: User[];
+  users: Named[];
   initialAction?: string;
-  sinceDays?: number;
   onOpenCase: (id: string) => void;
 }) {
   const s = useStyles();
   const [query, setQuery] = useState('');
   const [action, setAction] = useState(initialAction ?? '');
-  const [since] = useState(() => (sinceDays ? new Date(Date.now() - sinceDays * 86_400_000).toISOString() : null));
-  const scope = initialAction && since ? `?action=${encodeURIComponent(initialAction)}&since=${encodeURIComponent(since)}` : '?limit=500';
-  const audit = useQuery({ queryKey: ['audit', 'all', scope], queryFn: () => get<AuditEvent[]>(`/audit${scope}`) });
+  const [appFilter, setAppFilter] = useState('');
+  const audit = useQuery({ queryKey: ['audit', 'all', appFilter], queryFn: () => get<AuditEvent[]>(`/audit?limit=500${appFilter ? `&app=${appFilter}` : ''}`) });
   const verify = useMutation({ mutationFn: () => get<{ ok: boolean; count: number; brokenAtId: number | null; reason?: string }>('/audit/verify') });
 
   const actions = useMemo(() => [...new Set((audit.data ?? []).map((e) => e.action))].sort(), [audit.data]);
@@ -64,11 +62,11 @@ export function AuditLog({
 
   return (
     <section>
-      <PageHeader title="Audit log" subtitle="Every case change, view and SSN reveal, append-only and hash-chained">
+      <PageHeader title="Audit log" subtitle="Every change, view and access grant across all apps: append-only and hash-chained">
         <Button icon={<ShieldCheckmark20Regular />} onClick={() => verify.mutate()} disabled={verify.isPending} data-testid="verify-chain">
           Verify hash chain
         </Button>
-        <Button appearance="primary" icon={<ArrowDownload20Regular />} onClick={() => download('/audit.csv', 'audit-log.csv')}>
+        <Button appearance="primary" icon={<ArrowDownload20Regular />} onClick={() => download(`/audit/export.csv${appFilter ? `?app=${appFilter}` : ''}`, 'audit-log.csv')}>
           Export CSV
         </Button>
       </PageHeader>
@@ -92,6 +90,14 @@ export function AuditLog({
       <Surface>
         <div className={s.toolbar}>
           <SearchBox className={s.search} placeholder="Filter by case, user, reason" value={query} onChange={(_, d) => setQuery(d.value)} />
+          <Select value={appFilter} onChange={(_, d) => setAppFilter(d.value)} aria-label="App">
+            <option value="">All apps</option>
+            {APPS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
           <Select value={action} onChange={(_, d) => setAction(d.value)} aria-label="Action">
             <option value="">All actions</option>
             {actions.map((a) => (
@@ -118,7 +124,8 @@ export function AuditLog({
                 <TableHeaderCell style={{ width: 170 }}>When</TableHeaderCell>
                 <TableHeaderCell style={{ width: 220 }}>Who</TableHeaderCell>
                 <TableHeaderCell style={{ width: 220 }}>Action</TableHeaderCell>
-                <TableHeaderCell style={{ width: 100 }}>Case</TableHeaderCell>
+                <TableHeaderCell style={{ width: 110 }}>App</TableHeaderCell>
+                <TableHeaderCell style={{ width: 130 }}>Record</TableHeaderCell>
                 <TableHeaderCell>Changes</TableHeaderCell>
                 <TableHeaderCell>Reason</TableHeaderCell>
               </TableRow>
@@ -136,8 +143,9 @@ export function AuditLog({
                   <TableCell>
                     <TableCellLayout description={<span className="mono">{e.action}</span>}>{auditActionLabel(e)}</TableCellLayout>
                   </TableCell>
+                  <TableCell>{APPS.find((x) => x.id === e.appId)?.name ?? e.appId}</TableCell>
                   <TableCell>
-                    <Link className="mono" onClick={() => onOpenCase(e.entityId)}>
+                    <Link className="mono" disabled={e.entityType !== 'case'} onClick={() => onOpenCase(e.entityId)}>
                       {e.entityId}
                     </Link>
                   </TableCell>

@@ -8,17 +8,12 @@ import {
   type KycCase,
   type User,
 } from '@kyc/shared';
-import type { DB } from './db.js';
-import { appendAudit, diff } from './audit.js';
+import type { DB } from '../../platform/db.js';
+import { appendAudit, diff } from '../../platform/audit.js';
+import { HttpError } from '../../platform/errors.js';
 
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { HttpError };
+
 
 interface CaseRow {
   id: string;
@@ -147,7 +142,7 @@ export function viewCase(db: DB, user: User, id: string, requestId?: string): Ky
   return db.transaction(() => {
     const c = toCase(loadRow(db, id));
     authorize(user, 'case.view', c);
-    appendAudit(db, { actor: user, action: 'case.viewed', entityType: 'case', entityId: id, requestId });
+    appendAudit(db, { appId: 'kyc', actor: user, action: 'case.viewed', entityType: 'case', entityId: id, requestId });
     return c;
   })();
 }
@@ -158,6 +153,7 @@ export function revealSsn(db: DB, user: User, id: string, justification: string,
     const row = loadRow(db, id);
     authorize(user, 'case.reveal_ssn', toCase(row));
     appendAudit(db, {
+      appId: 'kyc',
       actor: user,
       action: 'case.ssn_revealed',
       entityType: 'case',
@@ -256,6 +252,7 @@ export function performAction(
 
     const after = toCase(loadRow(db, id));
     appendAudit(db, {
+      appId: 'kyc',
       actor: user,
       action: `case.${action}`,
       entityType: 'case',

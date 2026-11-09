@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'kyc.userId';
 
-let userId = localStorage.getItem(STORAGE_KEY) ?? 'u-alex';
+let userId = localStorage.getItem(STORAGE_KEY) ?? 'u-taylor';
 
 export function getUserId(): string {
   return userId;
@@ -38,6 +38,10 @@ export async function get<T>(path: string): Promise<T> {
 
 export async function post<T>(path: string, body: unknown = {}): Promise<T> {
   return (await request(path, { method: 'POST', body: JSON.stringify(body) })).json();
+}
+
+export async function put<T>(path: string, body: unknown = {}): Promise<T> {
+  return (await request(path, { method: 'PUT', body: JSON.stringify(body) })).json();
 }
 
 export async function download(path: string, filename: string): Promise<void> {

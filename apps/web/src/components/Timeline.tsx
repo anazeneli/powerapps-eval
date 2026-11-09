@@ -1,7 +1,8 @@
 import { Avatar, Text, makeStyles, tokens } from '@fluentui/react-components';
 import { Bot20Regular } from '@fluentui/react-icons';
-import type { AuditEvent, User } from '@kyc/shared';
+import type { AuditEvent } from '@kyc/shared';
 import { ROLE_LABELS, auditActionLabel, fieldLabel, formatTime, formatValue, userName } from '../format';
+import type { Named } from '../format';
 
 const useStyles = makeStyles({
   list: { listStyle: 'none', margin: 0, padding: 0 },
@@ -27,7 +28,7 @@ const useStyles = makeStyles({
   empty: { color: tokens.colorNeutralForeground3, padding: '12px 0' },
 });
 
-export function ChangeList({ e, users }: { e: AuditEvent; users: User[] }) {
+export function ChangeList({ e, users }: { e: AuditEvent; users: Named[] }) {
   const s = useStyles();
   if (!e.changes || Object.keys(e.changes).length === 0) return null;
   return (
@@ -41,7 +42,7 @@ export function ChangeList({ e, users }: { e: AuditEvent; users: User[] }) {
   );
 }
 
-export function ActorAvatar({ actorId, users, size = 32 }: { actorId: string; users: User[]; size?: 20 | 24 | 28 | 32 }) {
+export function ActorAvatar({ actorId, users, size = 32 }: { actorId: string; users: Named[]; size?: 20 | 24 | 28 | 32 }) {
   const system = actorId.startsWith('system:');
   return (
     <Avatar
@@ -53,7 +54,7 @@ export function ActorAvatar({ actorId, users, size = 32 }: { actorId: string; us
   );
 }
 
-export function Timeline({ events, users }: { events: AuditEvent[]; users: User[] }) {
+export function Timeline({ events, users }: { events: AuditEvent[]; users: Named[] }) {
   const s = useStyles();
   if (events.length === 0) return <div className={s.empty}>No activity yet.</div>;
   return (

@@ -1,152 +1,48 @@
-import type { CheckOutcome, KycCase, User, VendorCheck } from '@kyc/shared';
-import type { DB } from './db.js';
-import { appendAudit } from './audit.js';
-import { performAction } from './kyc.js';
+import type { AppId } from '@kyc/shared';
+import type { DB } from './platform/db.js';
+import { appendAudit } from './platform/audit.js';
+import { seedKyc } from './apps/kyc/seed.js';
+import { seedRefunds } from './apps/refunds/seed.js';
+import { seedFlags } from './apps/flags/seed.js';
 
-export const USERS: User[] = [
-  { id: 'u-alex', name: 'Alex Rivera', role: 'analyst' },
-  { id: 'u-bea', name: 'Bea Okafor', role: 'analyst' },
-  { id: 'u-sam', name: 'Sam Chen', role: 'senior_reviewer' },
-  { id: 'u-riley', name: 'Riley Park', role: 'senior_reviewer' },
-  { id: 'u-casey', name: 'Casey Morgan', role: 'compliance_admin' },
+export const PEOPLE: { id: string; name: string; title: string; roles: Partial<Record<AppId, string>> }[] = [
+  { id: 'u-taylor', name: 'Taylor Brooks', title: 'VP Engineering', roles: { kyc: 'compliance_admin', refunds: 'viewer', flags: 'viewer', audit: 'auditor' } },
+  { id: 'u-alex', name: 'Alex Rivera', title: 'KYC Analyst', roles: { kyc: 'analyst', refunds: 'agent' } },
+  { id: 'u-bea', name: 'Bea Okafor', title: 'KYC Analyst', roles: { kyc: 'analyst' } },
+  { id: 'u-sam', name: 'Sam Chen', title: 'Senior KYC Reviewer', roles: { kyc: 'senior_reviewer', refunds: 'approver' } },
+  { id: 'u-riley', name: 'Riley Park', title: 'Senior KYC Reviewer', roles: { kyc: 'senior_reviewer' } },
+  { id: 'u-casey', name: 'Casey Morgan', title: 'Compliance Officer', roles: { kyc: 'compliance_admin', audit: 'auditor' } },
+  { id: 'u-jordan', name: 'Jordan Lee', title: 'Support Agent', roles: { refunds: 'agent' } },
+  { id: 'u-morgan', name: 'Morgan Diaz', title: 'Finance Manager', roles: { refunds: 'finance_manager' } },
+  { id: 'u-dev', name: 'Dev Patel', title: 'Software Engineer', roles: { flags: 'editor' } },
+  { id: 'u-priya', name: 'Priya Shah', title: 'Engineering Manager', roles: { flags: 'release_manager' } },
+  { id: 'u-avery', name: 'Avery Kim', title: 'IT Administrator', roles: { access: 'admin', audit: 'auditor' } },
+  { id: 'u-quinn', name: 'Quinn Fox', title: 'IT Administrator', roles: { access: 'admin' } },
 ];
 
-const FIRST = ['Maya', 'Liam', 'Sofia', 'Noah', 'Aisha', 'Mateo', 'Chloe', 'Ethan', 'Priya', 'Lucas', 'Zara', 'Diego', 'Hana', 'Owen', 'Fatima', 'Leo', 'Grace', 'Kenji', 'Amara', 'Jonah'];
-const LAST = ['Patel', 'Nguyen', 'Garcia', 'Kim', 'Okonkwo', 'Silva', 'Johnson', 'Haddad', 'Novak', 'Brown', 'Tanaka', 'Mensah', 'Rossi', 'Cohen', 'Lopez'];
-const COUNTRIES = ['US', 'US', 'US', 'US', 'US', 'GB', 'CA', 'MX', 'NG', 'DE'];
-
-const CHECKS: Record<string, Record<CheckOutcome, string>> = {
-  'Document authenticity': {
-    pass: 'Driver license security features verified',
-    review: 'Glare on document; MRZ partially unreadable',
-    fail: 'Font inconsistencies detected in date of birth field',
-  },
-  'Selfie / liveness': {
-    pass: 'Face match 97%, liveness passed',
-    review: 'Face match 71%, below auto-approve threshold',
-    fail: 'Liveness check failed (possible screen replay)',
-  },
-  'Watchlist screening (OFAC/PEP)': {
-    pass: 'No matches',
-    review: 'Possible name match on PEP list (score 0.82)',
-    fail: 'Strong match on OFAC SDN list (score 0.96)',
-  },
-  'Address verification': {
-    pass: 'Address matches credit header',
-    review: 'Address not found in credit header',
-    fail: 'Address is a known mail drop',
-  },
-};
-
-/** Deterministic PRNG so the seed data is the same on every run. */
-function rng(seed: number) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 2 ** 32;
-  };
-}
-
-const SYSTEM = { id: 'system:idv-vendor', role: 'system' };
+const PROVISIONING = { id: 'system:provisioning', role: 'system' };
 
 export function seed(db: DB, opts: { count?: number; now?: number } = {}): void {
-  const count = opts.count ?? 50;
   const now = opts.now ?? Date.now();
-  const rand = rng(42);
-  const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
-
   db.transaction(() => {
-    const insertUser = db.prepare('INSERT INTO users (id, name, role) VALUES (@id, @name, @role)');
-    for (const u of USERS) insertUser.run(u);
-
-    const insertCase = db.prepare(
-      `INSERT INTO cases (id, customer_name, date_of_birth, country, ssn, risk_level, risk_score, vendor_checks, status, created_at, updated_at)
-       VALUES (@id, @customer_name, @date_of_birth, @country, @ssn, @risk_level, @risk_score, @vendor_checks, 'new', @created_at, @created_at)`,
-    );
-
-    const cases: { id: string; created: number }[] = [];
-    for (let i = 0; i < count; i++) {
-      const checks: VendorCheck[] = Object.entries(CHECKS).map(([check, details]) => {
-        const r = rand();
-        const outcome: CheckOutcome = r < 0.6 ? 'pass' : r < 0.9 ? 'review' : 'fail';
-        return { check, outcome, detail: details[outcome] };
-      });
-      if (checks.every((c) => c.outcome === 'pass')) {
-        const c = checks[Math.floor(rand() * checks.length)];
-        c.outcome = 'review';
-        c.detail = CHECKS[c.check].review;
+    const at = new Date(now - 30 * 86_400_000).toISOString();
+    for (const p of PEOPLE) {
+      db.prepare('INSERT INTO users (id, name, title, created_at) VALUES (?, ?, ?, ?)').run(p.id, p.name, p.title, at);
+      for (const [appId, role] of Object.entries(p.roles)) {
+        db.prepare('INSERT INTO app_roles (user_id, app_id, role, granted_by, granted_at) VALUES (?, ?, ?, ?, ?)').run(p.id, appId, role, PROVISIONING.id, at);
+        appendAudit(db, {
+          appId: 'access',
+          actor: PROVISIONING,
+          action: 'access.granted',
+          entityType: 'user',
+          entityId: p.id,
+          changes: { [appId]: { from: null, to: role } },
+          reason: 'Initial provisioning',
+        });
       }
-      const score = Math.min(
-        99,
-        checks.reduce((s, c) => s + (c.outcome === 'fail' ? 45 : c.outcome === 'review' ? 20 : 0), 0) + Math.floor(rand() * 10),
-      );
-      const riskLevel: KycCase['riskLevel'] = score >= 60 ? 'high' : score >= 35 ? 'medium' : 'low';
-      const created = now - Math.floor(rand() * 72 * 3600 * 1000);
-      const ssn = `${100 + Math.floor(rand() * 800)}-${10 + Math.floor(rand() * 89)}-${1000 + Math.floor(rand() * 8999)}`;
-      const year = 1955 + Math.floor(rand() * 50);
-      const month = String(1 + Math.floor(rand() * 12)).padStart(2, '0');
-      const day = String(1 + Math.floor(rand() * 28)).padStart(2, '0');
-      const id = `KYC-${1001 + i}`;
-      cases.push({ id, created });
-      insertCase.run({
-        id,
-        customer_name: `${pick(FIRST)} ${pick(LAST)}`,
-        date_of_birth: `${year}-${month}-${day}`,
-        country: pick(COUNTRIES),
-        ssn,
-        risk_level: riskLevel,
-        risk_score: score,
-        vendor_checks: JSON.stringify(checks),
-        created_at: new Date(created).toISOString(),
-      });
     }
-
-    // Audit the vendor-created cases in creation order.
-    for (const c of [...cases].sort((a, b) => a.created - b.created)) {
-      appendAudit(db, {
-        actor: SYSTEM,
-        action: 'case.created',
-        entityType: 'case',
-        entityId: c.id,
-        reason: 'Automated identity verification returned exceptions',
-      });
-    }
-
-    // Move a few cases through the workflow using the real write path so the audit trail is consistent.
-    const rows = db.prepare('SELECT id, risk_level FROM cases ORDER BY id').all() as { id: string; risk_level: string }[];
-    const used = new Set<string>();
-    const take = (pred: (r: { risk_level: string }) => boolean) => {
-      const r = rows.find((x) => !used.has(x.id) && pred(x));
-      if (!r) throw new Error('seed: no matching case');
-      used.add(r.id);
-      return r.id;
-    };
-    const user = (id: string) => USERS.find((u) => u.id === id)!;
-    const alex = user('u-alex');
-    const bea = user('u-bea');
-    const sam = user('u-sam');
-
-    for (let i = 0; i < 3; i++) performAction(db, alex, take((r) => r.risk_level !== 'high'), 'claim');
-    performAction(db, alex, take((r) => r.risk_level === 'high'), 'claim');
-
-    const info = take(() => true);
-    performAction(db, alex, info, 'claim');
-    performAction(db, alex, info, 'request_info', { note: 'Asked customer for a clearer photo of the license' });
-
-    const esc = take(() => true);
-    performAction(db, bea, esc, 'claim');
-    performAction(db, bea, esc, 'escalate', { note: 'Possible PEP match; needs senior review' });
-
-    const second = take((r) => r.risk_level === 'high');
-    performAction(db, bea, second, 'claim');
-    performAction(db, bea, second, 'approve', { reasonCode: 'watchlist_false_positive', note: 'DOB differs from listed PEP' });
-
-    const approved = take((r) => r.risk_level === 'low');
-    performAction(db, bea, approved, 'claim');
-    performAction(db, bea, approved, 'approve', { reasonCode: 'docs_verified' });
-
-    const rejected = take(() => true);
-    performAction(db, sam, rejected, 'claim');
-    performAction(db, sam, rejected, 'reject', { reasonCode: 'document_fraud', note: 'Template match to known fake license' });
   })();
+  seedKyc(db, opts);
+  seedRefunds(db, now);
+  seedFlags(db, now);
 }

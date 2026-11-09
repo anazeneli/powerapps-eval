@@ -50,6 +50,33 @@ Rough rebuild estimates (judgment, not benchmarks; see research §6):
 
 Security review, compliance or sponsor-bank sign-off, and running both systems side by side don't get faster with an agent.
 
+## Multi-app platform
+
+The main business need is a portal for many internal apps, so the prototype is now a shared platform with apps as modules. KYC was the first app built on it.
+
+- **Landing page:** shows a tile, with live numbers, for each app the person has a role in. Other apps appear as locked. People can pin favourites. An app launcher in the header switches between apps.
+- **Per-app roles:** someone can be a KYC analyst and a refunds approver at the same time. Every app's API checks the role on each request.
+- **Access Admin:** a person or role can be added, changed or removed only with a reason, and each change writes an audit event. Admins can't change their own access, and there is an access-review CSV export.
+- **Audit Center:** one append-only, hash-chained log covering every app, filterable by app.
+- **Minimal data in lists:** lists show a shortened customer name and no date of birth, country or SSN. Every list load is logged, recording the filter, row count and IDs returned.
+
+| App | What it proves | App-specific lines (API + shared + UI) |
+|---|---|---|
+| KYC Review | Hardest compliance case: four-eyes approval, masking, row-level access | ~1,800 |
+| Refunds | Money movement: maker-checker, two approvers over $1,000, no over-refunding, idempotent mock processor | ~650 |
+| Feature Flags | Low-risk admin app; critical production changes need a second release manager | ~390 |
+| Audit Center, Access Admin | Platform screens | ~310 |
+| **Shared platform** | Login stand-in, app registry, roles, audit, write path, shell | ~1,400 |
+
+Each new app reuses the shell, access checks, audit log, timeline and approval patterns. Refunds took about a third of KYC's code and Flags about a fifth. That curve is the evidence for estimating the 10 planned apps.
+
+Demo people (mock login from the user menu):
+- Taylor: compliance admin, sees most apps.
+- Jordan: refunds agent only.
+- Sam and Morgan: refund approvers.
+- Dev and Priya: flags.
+- Avery: access admin.
+
 ## The prototype: KYC review queue MVP
 
 **What it shows:**

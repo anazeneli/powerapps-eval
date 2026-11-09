@@ -1,6 +1,6 @@
 import { buildApp } from './app.js';
 import { DB_FILE, PORT, ensureDataDir } from './config.js';
-import { openDb } from './db.js';
+import { openDb } from './platform/db.js';
 import { seed } from './seed.js';
 
 ensureDataDir();

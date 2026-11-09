@@ -6,7 +6,6 @@ import {
   type AuditEvent,
   type CaseStatus,
   type RiskLevel,
-  type User,
 } from '@kyc/shared';
 
 export type CaseFilter =
@@ -88,6 +87,14 @@ export const ROLE_LABELS: Record<string, string> = {
   analyst: 'Analyst',
   senior_reviewer: 'Senior reviewer',
   compliance_admin: 'Compliance admin',
+  agent: 'Support agent',
+  approver: 'Approver',
+  finance_manager: 'Finance manager',
+  viewer: 'Viewer',
+  editor: 'Editor',
+  release_manager: 'Release manager',
+  auditor: 'Auditor',
+  admin: 'Access admin',
   system: 'System',
 };
 
@@ -105,7 +112,9 @@ export function fieldLabel(field: string): string {
   return FIELD_LABELS[field] ?? field;
 }
 
-export function formatValue(field: string, v: unknown, users: User[]): string {
+export type Named = { id: string; name: string };
+
+export function formatValue(field: string, v: unknown, users: Named[]): string {
   if (v === null || v === undefined) return '—';
   if (field === 'status') return STATUS_LABELS[v as CaseStatus] ?? String(v);
   if (field === 'decisionReasonCode') return REASON_LABELS[String(v)] ?? String(v);
@@ -135,6 +144,29 @@ export function auditActionLabel(e: AuditEvent): string {
       return 'Rejected';
     case 'case.ssn_revealed':
       return 'Revealed full SSN';
+    case 'refund.requested':
+      return 'Requested refund';
+    case 'refund.approve':
+      if (e.changes?.status?.to === 'pending_second_approval') return 'Approved refund (1st of 2)';
+      return 'Approved refund · issued';
+    case 'refund.reject':
+      return 'Rejected refund';
+    case 'flag.changed':
+      return 'Changed flag';
+    case 'flag.change_requested':
+      return 'Requested production change';
+    case 'flag.change_approved':
+      return 'Approved production change';
+    case 'flag.change_rejected':
+      return 'Rejected production change';
+    case 'access.granted':
+      return 'Granted access';
+    case 'access.changed':
+      return 'Changed role';
+    case 'access.revoked':
+      return 'Revoked access';
+    case 'access.person_added':
+      return 'Added person';
     default:
       return e.action;
   }
@@ -146,8 +178,9 @@ export function age(createdAt: string): { hours: number; label: string; overdue:
   return { hours, label, overdue: hours >= SLA_HOURS };
 }
 
-export function userName(users: User[] | undefined, id: string | null): string {
+export function userName(users: Named[] | undefined, id: string | null): string {
   if (!id) return '—';
+  if (id === 'system:provisioning') return 'Provisioning (automated)';
   if (id.startsWith('system:')) return 'Identity vendor (automated)';
   return users?.find((u) => u.id === id)?.name ?? id;
 }
