@@ -85,7 +85,7 @@ const useStyles = makeStyles({
   entity: { color: tokens.colorNeutralForeground3, textTransform: 'uppercase', letterSpacing: '0.04em' },
   headerFields: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
     gap: '12px',
     marginTop: '14px',
     paddingTop: '12px',
@@ -102,7 +102,13 @@ const useStyles = makeStyles({
     marginBottom: '12px',
     flexWrap: 'wrap',
   },
-  columns: { display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(320px, 2fr)', gap: '12px', alignItems: 'start' },
+  columns: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 3fr) minmax(320px, 2fr)',
+    gap: '12px',
+    alignItems: 'start',
+    '@media (max-width: 1100px)': { gridTemplateColumns: 'minmax(0, 1fr)' },
+  },
   stack: { display: 'flex', flexDirection: 'column', gap: '12px' },
   fields: { display: 'grid', gridTemplateColumns: '160px 1fr', rowGap: '10px', columnGap: '12px', padding: '4px 4px 8px' },
   label: { color: tokens.colorNeutralForeground3 },

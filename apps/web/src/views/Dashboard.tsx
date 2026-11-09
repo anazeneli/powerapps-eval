@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Badge,
@@ -34,19 +34,37 @@ const STATUS_HEX: Record<string, string> = {
 const RISK_HEX = { low: '#107C10', medium: '#F2A900', high: '#C50F1F' };
 
 const useStyles = makeStyles({
-  kpis: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px', marginBottom: '12px' },
+  kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' },
   kpi: { padding: '14px 16px' },
   kpiLabel: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   kpiValue: { fontSize: '30px', lineHeight: '38px', fontWeight: tokens.fontWeightSemibold },
   kpiNote: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 },
   alert: { color: tokens.colorPaletteRedForeground1 },
-  charts: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr)', gap: '12px', marginBottom: '12px' },
-  lists: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' },
-  chart: { minHeight: '240px' },
+  charts: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px', marginBottom: '12px' },
+  lists: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '12px' },
+  card: { minWidth: 0 },
   row: { cursor: 'pointer' },
   muted: { color: tokens.colorNeutralForeground3 },
   overdue: { color: tokens.colorPaletteRedForeground1, fontWeight: tokens.fontWeightSemibold },
 });
+
+/** Measures its own width so charts redraw to fill their card as the window resizes. */
+function ChartBox({ height, children }: { height: number; children: (width: number) => ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} style={{ width: '100%', minWidth: 0, height, overflow: 'hidden' }}>
+      {width > 0 && children(width)}
+    </div>
+  );
+}
 
 function Kpi({ label, value, note, alert }: { label: string; value: ReactNode; note?: string; alert?: boolean }) {
   const s = useStyles();
@@ -159,32 +177,32 @@ export default function Dashboard({ me, onOpen }: { me: User; users: User[]; onO
       </div>
 
       <div className={s.charts}>
-        <Card>
+        <Card className={s.card}>
           <CardHeader header={<Text weight="semibold">Cases by status</Text>} />
-          <div className={s.chart}>
-            <DonutChart data={{ chartTitle: 'Cases by status', chartData: statusData }} innerRadius={55} valueInsideDonut={total} height={240} />
-          </div>
+          <ChartBox height={260}>
+            {(w) => <DonutChart key={w} data={{ chartData: statusData }} innerRadius={55} valueInsideDonut={total} width={w} height={260} />}
+          </ChartBox>
         </Card>
-        <Card>
+        <Card className={s.card}>
           <CardHeader header={<Text weight="semibold">Risk mix</Text>} />
-          <div className={s.chart}>
-            <DonutChart data={{ chartTitle: 'Risk mix', chartData: riskData }} innerRadius={55} valueInsideDonut={total} height={240} />
-          </div>
+          <ChartBox height={260}>
+            {(w) => <DonutChart key={w} data={{ chartData: riskData }} innerRadius={55} valueInsideDonut={total} width={w} height={260} />}
+          </ChartBox>
         </Card>
-        <Card>
+        <Card className={s.card}>
           <CardHeader header={<Text weight="semibold">Decisions per day</Text>} />
-          <div className={s.chart}>
-            <VerticalStackedBarChart data={decisions} height={240} yAxisTickCount={4} />
-          </div>
+          <ChartBox height={260}>
+            {(w) => <VerticalStackedBarChart key={w} data={decisions} width={w} height={260} yAxisTickCount={4} />}
+          </ChartBox>
         </Card>
       </div>
 
       <div className={s.lists}>
-        <Card>
+        <Card className={s.card}>
           <CardHeader header={<Text weight="semibold">My open cases</Text>} />
           <CaseList cases={mine} empty="Nothing assigned to you." onOpen={onOpen} />
         </Card>
-        <Card>
+        <Card className={s.card}>
           <CardHeader
             header={<Text weight="semibold">Needs attention</Text>}
             description={<Text size={200} className={s.muted}>SLA breached, escalated or awaiting 2nd approval</Text>}
