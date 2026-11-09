@@ -56,13 +56,24 @@ const useStyles = makeStyles({
     flexShrink: 0,
   },
   onBrand,
-  title: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase400, whiteSpace: 'nowrap', paddingLeft: '4px', cursor: 'pointer' },
-  org: { opacity: 0.75, fontWeight: tokens.fontWeightRegular },
-  search: { margin: '0 auto', width: '380px', maxWidth: '36vw' },
+  title: {
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase400,
+    whiteSpace: 'nowrap',
+    paddingLeft: '4px',
+    cursor: 'pointer',
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  org: { opacity: 0.75, fontWeight: tokens.fontWeightRegular, '@media (max-width: 1000px)': { display: 'none' } },
+  orgSep: { '@media (max-width: 1000px)': { display: 'none' } },
+  search: { margin: '0 auto', width: '380px', maxWidth: '36vw', minWidth: '120px', flexShrink: 1 },
   spacer: { margin: '0 auto' },
-  right: { display: 'flex', alignItems: 'center', gap: '8px' },
+  right: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 },
+  mockBadge: { '@media (max-width: 760px)': { display: 'none' } },
   userBtn: { ...onBrand, padding: '0 6px', textAlign: 'left' },
-  userText: { display: 'flex', flexDirection: 'column', lineHeight: '1.1' },
+  userText: { display: 'flex', flexDirection: 'column', lineHeight: '1.1', '@media (max-width: 900px)': { display: 'none' } },
   userRole: { fontSize: tokens.fontSizeBase100, opacity: 0.8 },
   body: { display: 'flex', flex: 1, minHeight: 0 },
   nav: { height: '100%', borderRight: `1px solid ${tokens.colorNeutralStroke2}` },
@@ -124,7 +135,9 @@ export function AppShell({
           </MenuPopover>
         </Menu>
         <div className={s.title} onClick={() => openApp('home')} title="Back to Home">
-          <span className={s.org}>Contoso Financial</span> &nbsp;|&nbsp; {appName}
+          <span className={s.org}>Contoso Financial</span>
+          <span className={s.orgSep}> &nbsp;|&nbsp; </span>
+          {appName}
         </div>
         {onSearch ? (
           <SearchBox
@@ -141,7 +154,7 @@ export function AppShell({
         )}
         <div className={s.right}>
           <Tooltip content="Stand-in for Microsoft Entra ID sign-in" relationship="description">
-            <Badge color="warning" appearance="filled">
+            <Badge color="warning" appearance="filled" className={s.mockBadge}>
               Mock auth
             </Badge>
           </Tooltip>
