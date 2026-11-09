@@ -9,7 +9,22 @@ import {
   type User,
 } from '@kyc/shared';
 
-export type CaseFilter = 'all' | 'new' | 'mine' | 'pending_info' | 'escalated' | 'second_approval' | 'closed';
+export type CaseFilter =
+  | 'all'
+  | 'new'
+  | 'mine'
+  | 'in_review'
+  | 'pending_info'
+  | 'escalated'
+  | 'second_approval'
+  | 'closed'
+  | 'open'
+  | 'overdue'
+  | 'decided_7d'
+  | 'four_eyes'
+  | 'risk_low'
+  | 'risk_medium'
+  | 'risk_high';
 export type BadgeColor = 'brand' | 'danger' | 'important' | 'informative' | 'severe' | 'subtle' | 'success' | 'warning';
 
 export const VIEW_LABELS: Record<CaseFilter, string> = {
@@ -20,6 +35,24 @@ export const VIEW_LABELS: Record<CaseFilter, string> = {
   escalated: 'Escalated',
   second_approval: 'Awaiting 2nd approval',
   closed: 'Closed',
+  in_review: 'In review',
+  open: 'Open cases',
+  overdue: 'SLA breached (>48h)',
+  decided_7d: 'Decided in the last 7 days',
+  four_eyes: 'Four-eyes approvals',
+  risk_low: 'Low-risk cases',
+  risk_medium: 'Medium-risk cases',
+  risk_high: 'High-risk cases',
+};
+
+export const STATUS_FILTERS: Record<CaseStatus, CaseFilter> = {
+  new: 'new',
+  in_review: 'in_review',
+  pending_info: 'pending_info',
+  escalated: 'escalated',
+  pending_second_approval: 'second_approval',
+  approved: 'closed',
+  rejected: 'closed',
 };
 
 export const STATUS_LABELS: Record<CaseStatus, string> = {

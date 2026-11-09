@@ -153,7 +153,7 @@ export function CaseGrid({
     <section>
       <PageHeader title={VIEW_LABELS[filter]} subtitle="KYC review cases from automated identity verification exceptions" />
       {me.role === 'analyst' && (
-        <MessageBar intent="info" style={{ marginBottom: 12 }}>
+        <MessageBar layout="multiline" intent="info" style={{ marginBottom: 12 }}>
           <MessageBarBody>Row-level access: as an analyst you see unassigned new cases and cases assigned to you.</MessageBarBody>
         </MessageBar>
       )}
@@ -178,7 +178,7 @@ export function CaseGrid({
             ))}
           </Skeleton>
         ) : cases.error ? (
-          <MessageBar intent="error">
+          <MessageBar layout="multiline" intent="error">
             <MessageBarBody>{(cases.error as Error).message}</MessageBarBody>
           </MessageBar>
         ) : rows.length === 0 ? (

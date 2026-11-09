@@ -265,3 +265,40 @@ describe('review findings', () => {
     expect(() => db.prepare('UPDATE audit_chain_head SET last_id = last_id - 1').run()).toThrow(/forward/);
   });
 });
+
+describe('dashboard drill-down filters', () => {
+  const list = async (filter: string, userId = 'u-sam') =>
+    (await app.inject({ method: 'GET', url: `/api/cases?filter=${filter}`, headers: as(userId) })).json() as {
+      status: string;
+      riskLevel: string;
+      createdAt: string;
+      secondApproverId: string | null;
+    }[];
+  const closed = (s: string) => s === 'approved' || s === 'rejected';
+
+  it('each KPI filter returns only matching cases and agrees with the stats', async () => {
+    const stats = (await app.inject({ method: 'GET', url: '/api/stats', headers: as('u-sam') })).json();
+    const open = await list('open');
+    expect(open).toHaveLength(stats.open);
+    expect(open.every((c) => !closed(c.status))).toBe(true);
+
+    const overdue = await list('overdue');
+    expect(overdue).toHaveLength(stats.slaBreaches);
+    expect(overdue.every((c) => !closed(c.status) && Date.now() - Date.parse(c.createdAt) >= 48 * 3_600_000)).toBe(true);
+
+    expect(await list('four_eyes')).toHaveLength(stats.fourEyesApprovals);
+    expect((await list('four_eyes')).every((c) => c.secondApproverId)).toBe(true);
+    expect((await list('decided_7d')).every((c) => closed(c.status))).toBe(true);
+    expect((await list('in_review')).every((c) => c.status === 'in_review')).toBe(true);
+    for (const r of ['low', 'medium', 'high']) {
+      const cases = await list(`risk_${r}`);
+      expect(cases).toHaveLength(stats.byRisk[r]);
+      expect(cases.every((c) => c.riskLevel === r)).toBe(true);
+    }
+  });
+
+  it('drill-down lists still apply row-level access', async () => {
+    const stats = (await app.inject({ method: 'GET', url: '/api/stats', headers: as('u-alex') })).json();
+    expect(await list('open', 'u-alex')).toHaveLength(stats.open);
+  });
+});
