@@ -3,6 +3,7 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import { can, type Role, type User } from '@kyc/shared';
 import type { DB } from './db.js';
 import { listAudit, toCsv, verifyChain } from './audit.js';
+import { kycStats } from './stats.js';
 import {
   CASE_ACTIONS,
   CASE_FILTERS,
@@ -61,6 +62,8 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
     if (!CASE_FILTERS.includes(filter)) throw new HttpError(400, `filter must be one of: ${CASE_FILTERS.join(', ')}`);
     return listCases(db, req.user, filter);
   });
+
+  app.get('/api/stats', async (req) => kycStats(db, req.user));
 
   app.get<{ Params: { id: string } }>('/api/cases/:id', async (req) => viewCase(db, req.user, req.params.id, req.id));
 

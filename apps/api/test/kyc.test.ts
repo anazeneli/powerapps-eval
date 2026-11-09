@@ -180,3 +180,40 @@ describe('SSN masking', () => {
     for (const s of ssns) expect(csv.body).not.toContain(s);
   });
 });
+
+describe('dashboard stats', () => {
+  const stats = async (userId: string) => (await app.inject({ method: 'GET', url: '/api/stats', headers: as(userId) })).json();
+
+  it('scopes numbers to the cases the caller can view', async () => {
+    const all = await stats('u-sam');
+    const alex = await stats('u-alex');
+    const visible = (await app.inject({ method: 'GET', url: '/api/cases', headers: as('u-alex') })).json() as unknown[];
+    expect(all.scope).toBe('all');
+    expect(Object.values(all.byStatus as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(50);
+    expect(alex.scope).toBe('visible');
+    expect(Object.values(alex.byStatus as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(visible.length);
+  });
+
+  it('counts decisions, four-eyes approvals and reveals', async () => {
+    const id = caseIdWhere("status = 'new' AND risk_level = 'high'");
+    await action('u-alex', id, 'claim');
+    await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-alex'), payload: { justification: 'Check' } });
+    await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' });
+    const before = await stats('u-casey');
+    await action('u-sam', id, 'approve', { reasonCode: 'docs_verified' });
+    const after = await stats('u-casey');
+    expect(after.decided7d).toBe(before.decided7d + 1);
+    expect(after.fourEyesApprovals).toBe(before.fourEyesApprovals + 1);
+    expect(after.awaitingSecond).toBe(before.awaitingSecond - 1);
+    expect(after.ssnReveals7d).toBeGreaterThanOrEqual(1);
+    expect(after.decisionsByDay).toHaveLength(7);
+  });
+
+  it('returns no customer data and writes no audit events', async () => {
+    const count = () => (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
+    const n = count();
+    const body = JSON.stringify(await stats('u-sam'));
+    expect(count()).toBe(n);
+    expect(body).not.toMatch(/\d{3}-\d{2}-\d{4}|customerName|ssn"/);
+  });
+});

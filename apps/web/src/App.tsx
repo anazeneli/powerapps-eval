@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { can, type User } from '@kyc/shared';
+import { Spinner } from '@fluentui/react-components';
+import type { User } from '@kyc/shared';
 import { get, getUserId, setUserId } from './api';
-import { ROLE_LABELS } from './format';
-import { Queue } from './Queue';
-import { CaseDetail } from './CaseDetail';
-import { AuditLog } from './AuditLog';
+import { AppShell, type View } from './shell/AppShell';
+import { CaseGrid } from './views/CaseGrid';
+import { CaseForm } from './views/CaseForm';
+import { AuditLog } from './views/AuditLog';
 
-type View = { name: 'queue' } | { name: 'case'; id: string } | { name: 'audit' };
+const Dashboard = lazy(() => import('./views/Dashboard'));
 
 export function App() {
   const queryClient = useQueryClient();
   const [userId, setUser] = useState(getUserId());
-  const [view, setView] = useState<View>({ name: 'queue' });
+  const [view, setView] = useState<View>({ name: 'dashboard' });
+  const [search, setSearch] = useState('');
   const users = useQuery({ queryKey: ['users'], queryFn: () => get<User[]>('/users') });
   const me = users.data?.find((u) => u.id === userId);
 
@@ -20,46 +22,37 @@ export function App() {
     setUserId(id);
     setUser(id);
     queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'users' });
-    setView({ name: 'queue' });
+    setView({ name: 'dashboard' });
   };
 
+  const navigate = (v: View) => {
+    if (v.name !== 'grid') setSearch('');
+    setView(v);
+  };
+  const openCase = (id: string) => setView({ name: 'case', id, from: view.name === 'case' ? view.from : view });
+
+  const onSearch = (q: string) => {
+    const term = q.trim();
+    if (/^KYC-\d+$/i.test(term)) return openCase(term.toUpperCase());
+    setSearch(term);
+    setView({ name: 'grid', filter: 'all' });
+  };
+
+  if (!me || !users.data) return <Spinner label="Loading…" style={{ marginTop: 120 }} />;
+
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">KYC Review Queue</div>
-        <nav>
-          <button className={view.name !== 'audit' ? 'nav active' : 'nav'} onClick={() => setView({ name: 'queue' })}>
-            Queue
-          </button>
-          {me && can(me, 'audit.view_all').ok && (
-            <button className={view.name === 'audit' ? 'nav active' : 'nav'} onClick={() => setView({ name: 'audit' })}>
-              Audit log
-            </button>
-          )}
-        </nav>
-        <label className="switcher">
-          Signed in as
-          <select value={userId} onChange={(e) => switchUser(e.target.value)} data-testid="user-switcher">
-            {users.data?.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({ROLE_LABELS[u.role]})
-              </option>
-            ))}
-          </select>
-          <span className="mock-tag" title="Stand-in for Microsoft Entra ID sign-in">mock auth</span>
-        </label>
-      </header>
-      <main>
-        {!me ? (
-          <p>Loading…</p>
-        ) : view.name === 'queue' ? (
-          <Queue me={me} users={users.data!} onOpen={(id) => setView({ name: 'case', id })} />
-        ) : view.name === 'case' ? (
-          <CaseDetail me={me} users={users.data!} id={view.id} onBack={() => setView({ name: 'queue' })} />
-        ) : (
-          <AuditLog users={users.data!} onOpenCase={(id) => setView({ name: 'case', id })} />
-        )}
-      </main>
-    </div>
+    <AppShell me={me} users={users.data} view={view} onNavigate={navigate} onSwitchUser={switchUser} onSearch={onSearch}>
+      {view.name === 'dashboard' ? (
+        <Suspense fallback={<Spinner label="Loading dashboard…" />}>
+          <Dashboard me={me} users={users.data} onOpen={openCase} />
+        </Suspense>
+      ) : view.name === 'grid' ? (
+        <CaseGrid key={`${view.filter}:${search}`} me={me} users={users.data} filter={view.filter} initialSearch={search} onOpen={openCase} />
+      ) : view.name === 'case' ? (
+        <CaseForm key={view.id} me={me} users={users.data} id={view.id} onBack={() => navigate(view.from)} />
+      ) : (
+        <AuditLog users={users.data} onOpenCase={openCase} />
+      )}
+    </AppShell>
   );
 }
