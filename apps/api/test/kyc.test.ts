@@ -3,6 +3,7 @@ import { openDb, type DB } from '../src/db.js';
 import { seed } from '../src/seed.js';
 import { buildApp } from '../src/app.js';
 import { verifyChain } from '../src/audit.js';
+import { APPROVE_REASON_CODES } from '@kyc/shared';
 
 let db: DB;
 let app: ReturnType<typeof buildApp>;
@@ -106,9 +107,9 @@ describe('decisions and four-eyes approval', () => {
     await action('u-alex', id, 'claim');
     const missing = await action('u-alex', id, 'approve');
     expect(missing.statusCode).toBe(400);
-    expect(missing.json().error).toBe(
-      'Choose a reason code to approve: Documents verified, Manual identity match confirmed, Watchlist hit is a false positive',
-    );
+    const message: string = missing.json().error;
+    expect(message).toMatch(/approve/i);
+    for (const code of Object.keys(APPROVE_REASON_CODES)) expect(message).toContain(code);
     expect((await action('u-alex', id, 'approve', { reasonCode: 'document_fraud' })).statusCode).toBe(400);
     expect((await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' })).json().status).toBe('approved');
   });
@@ -178,5 +179,89 @@ describe('SSN masking', () => {
     const csv = await app.inject({ method: 'GET', url: '/api/audit.csv', headers: as('u-casey') });
     const ssns = (db.prepare('SELECT ssn FROM cases').all() as { ssn: string }[]).map((r) => r.ssn);
     for (const s of ssns) expect(csv.body).not.toContain(s);
+  });
+});
+
+describe('dashboard stats', () => {
+  const stats = async (userId: string) => (await app.inject({ method: 'GET', url: '/api/stats', headers: as(userId) })).json();
+
+  it('scopes numbers to the cases the caller can view', async () => {
+    const all = await stats('u-sam');
+    const alex = await stats('u-alex');
+    const visible = (await app.inject({ method: 'GET', url: '/api/cases', headers: as('u-alex') })).json() as unknown[];
+    expect(all.scope).toBe('all');
+    expect(Object.values(all.byStatus as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(50);
+    expect(alex.scope).toBe('visible');
+    expect(Object.values(alex.byStatus as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(visible.length);
+  });
+
+  it('counts decisions, four-eyes approvals and reveals', async () => {
+    const id = caseIdWhere("status = 'new' AND risk_level = 'high'");
+    await action('u-alex', id, 'claim');
+    await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-alex'), payload: { justification: 'Check' } });
+    await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' });
+    const before = await stats('u-casey');
+    await action('u-sam', id, 'approve', { reasonCode: 'docs_verified' });
+    const after = await stats('u-casey');
+    expect(after.decided7d).toBe(before.decided7d + 1);
+    expect(after.fourEyesApprovals).toBe(before.fourEyesApprovals + 1);
+    expect(after.awaitingSecond).toBe(before.awaitingSecond - 1);
+    expect(after.ssnReveals7d).toBeGreaterThanOrEqual(1);
+    expect(after.decisionsByDay).toHaveLength(7);
+  });
+
+  it('returns no customer data and writes no audit events', async () => {
+    const count = () => (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
+    const n = count();
+    const body = JSON.stringify(await stats('u-sam'));
+    expect(count()).toBe(n);
+    expect(body).not.toMatch(/\d{3}-\d{2}-\d{4}|customerName|ssn"/);
+  });
+});
+
+describe('review findings', () => {
+  const csv = async () => (await app.inject({ method: 'GET', url: '/api/audit.csv', headers: as('u-casey') })).body;
+
+  it('rejects inherited object keys as reason codes', async () => {
+    const id = caseIdWhere("status = 'new' AND risk_level = 'low'");
+    await action('u-alex', id, 'claim');
+    for (const reasonCode of ['constructor', 'toString', '__proto__']) {
+      expect((await action('u-alex', id, 'approve', { reasonCode })).statusCode).toBe(400);
+    }
+    expect((db.prepare('SELECT status FROM cases WHERE id = ?').get(id) as { status: string }).status).toBe('in_review');
+  });
+
+  it('an analyst loses access once their first approval hands the case on', async () => {
+    const id = caseIdWhere("status = 'new' AND risk_level = 'high'");
+    await action('u-alex', id, 'claim');
+    expect((await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' })).json().status).toBe('pending_second_approval');
+    expect((await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-alex') })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-sam') })).statusCode).toBe(200);
+  });
+
+  it('exports the full audit log in ID order', async () => {
+    const lines = (await csv()).trim().split('\n');
+    const total = (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
+    expect(lines).toHaveLength(total + 1);
+    expect(lines[1].startsWith('1,')).toBe(true);
+  });
+
+  it('neutralises spreadsheet formulas in the CSV export', async () => {
+    const id = caseIdWhere("status = 'new'");
+    await action('u-alex', id, 'claim');
+    await action('u-alex', id, 'escalate', { note: '=HYPERLINK("http://evil.example","click")' });
+    const body = await csv();
+    expect(body).toContain(`"'=HYPERLINK(""http://evil.example"",""click"")"`);
+    expect(body).not.toMatch(/(^|,)=HYPERLINK/m);
+  });
+
+  it('detects events removed from the end of the chain', async () => {
+    expect(verifyChain(db).ok).toBe(true);
+    db.exec('DROP TRIGGER audit_events_no_delete');
+    db.prepare('DELETE FROM audit_events WHERE id = (SELECT MAX(id) FROM audit_events)').run();
+    const res = verifyChain(db);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/missing/);
+    expect(() => db.prepare('UPDATE audit_chain_head SET last_id = last_id - 1').run()).toThrow(/forward/);
   });
 });

@@ -147,7 +147,7 @@ function planPatch(user: User, c: KycCase, action: CaseActionName, input: Action
     if (!note) throw new HttpError(400, 'A note is required for this action');
   };
   const requireCode = (codes: Record<string, string>) => {
-    if (!input.reasonCode || !(input.reasonCode in codes)) {
+    if (typeof input.reasonCode !== 'string' || !Object.hasOwn(codes, input.reasonCode)) {
       const verb = action === 'reject' ? 'reject' : 'approve';
       throw new HttpError(400, `Choose a reason code to ${verb}: ${Object.entries(codes).map(([code, label]) => `${label} (${code})`).join(', ')}`);
     }

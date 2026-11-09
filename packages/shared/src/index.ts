@@ -111,7 +111,7 @@ export function can(user: User, action: Action, c?: CaseRef): Decision {
   switch (action) {
     case 'case.view':
       if (user.role !== 'analyst') return allow;
-      if (isAssignee || c.firstApproverId === user.id) return allow;
+      if (isAssignee) return allow;
       if (c.status === 'new' && c.assigneeId === null) return allow;
       return deny('Analysts can only open unassigned new cases or cases assigned to them');
 
@@ -152,4 +152,20 @@ export function can(user: User, action: Action, c?: CaseRef): Decision {
 
 export function maskSsn(ssn: string): string {
   return `***-**-${ssn.slice(-4)}`;
+}
+
+/** Aggregates for the dashboard. Counts only, no customer data; scoped to the cases the caller can view. */
+export interface KycStats {
+  scope: 'all' | 'visible';
+  open: number;
+  slaBreaches: number;
+  decided7d: number;
+  avgHoursToDecision: number | null;
+  approvalRate: number | null;
+  fourEyesApprovals: number;
+  awaitingSecond: number;
+  ssnReveals7d: number;
+  byStatus: Record<CaseStatus, number>;
+  byRisk: Record<RiskLevel, number>;
+  decisionsByDay: { date: string; approved: number; rejected: number }[];
 }

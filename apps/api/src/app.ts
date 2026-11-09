@@ -3,6 +3,7 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import { can, type Role, type User } from '@kyc/shared';
 import type { DB } from './db.js';
 import { listAudit, toCsv, verifyChain } from './audit.js';
+import { kycStats } from './stats.js';
 import {
   CASE_ACTIONS,
   CASE_FILTERS,
@@ -62,6 +63,8 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
     return listCases(db, req.user, filter);
   });
 
+  app.get('/api/stats', async (req) => kycStats(db, req.user));
+
   app.get<{ Params: { id: string } }>('/api/cases/:id', async (req) => viewCase(db, req.user, req.params.id, req.id));
 
   app.post<{ Params: { id: string }; Body: { justification?: string } }>('/api/cases/:id/reveal-ssn', async (req) => ({
@@ -94,7 +97,7 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
     return reply
       .header('content-type', 'text/csv; charset=utf-8')
       .header('content-disposition', 'attachment; filename="audit-log.csv"')
-      .send(toCsv(listAudit(db, { limit: 100000 })));
+      .send(toCsv(listAudit(db, { order: 'asc' })));
   });
 
   function viewableOrThrow(user: User, id: string) {
