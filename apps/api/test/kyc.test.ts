@@ -292,6 +292,9 @@ describe('dashboard drill-down filters', () => {
     expect((await list('four_eyes')).every((c) => c.secondApproverId)).toBe(true);
     expect((await list('decided_7d')).every((c) => closed(c.status))).toBe(true);
     expect((await list('in_review')).every((c) => c.status === 'in_review')).toBe(true);
+    expect(await list('approved')).toHaveLength(stats.byStatus.approved);
+    expect((await list('approved')).every((c) => c.status === 'approved')).toBe(true);
+    expect(await list('rejected')).toHaveLength(stats.byStatus.rejected);
     for (const r of ['low', 'medium', 'high']) {
       const cases = await list(`risk_${r}`);
       expect(cases).toHaveLength(stats.byRisk[r]);
@@ -306,7 +309,7 @@ describe('dashboard drill-down filters', () => {
 });
 
 describe('drill-down authorization', () => {
-  const FILTERS = ['all', 'new', 'mine', 'in_review', 'pending_info', 'escalated', 'second_approval', 'closed', 'open', 'overdue', 'decided_7d', 'four_eyes', 'risk_low', 'risk_medium', 'risk_high'];
+  const FILTERS = ['all', 'new', 'mine', 'in_review', 'approved', 'rejected', 'pending_info', 'escalated', 'second_approval', 'closed', 'open', 'overdue', 'decided_7d', 'four_eyes', 'risk_low', 'risk_medium', 'risk_high'];
   const auditCount = () => (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
 
   it('every filtered list, for every role, contains only cases that role may open', async () => {

@@ -87,6 +87,8 @@ export const CASE_FILTERS = [
   'escalated',
   'second_approval',
   'closed',
+  'approved',
+  'rejected',
   'open',
   'overdue',
   'decided_7d',
@@ -122,6 +124,9 @@ export function listCases(db: DB, user: User, filter: CaseFilter = 'all', now = 
           return closed(c);
         case 'in_review':
           return c.status === 'in_review';
+        case 'approved':
+        case 'rejected':
+          return c.status === filter;
         case 'open':
           return !closed(c);
         case 'overdue':
