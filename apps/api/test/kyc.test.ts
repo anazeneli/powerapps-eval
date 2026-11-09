@@ -107,7 +107,7 @@ describe('decisions and four-eyes approval', () => {
     const missing = await action('u-alex', id, 'approve');
     expect(missing.statusCode).toBe(400);
     expect(missing.json().error).toBe(
-      'Choose a reason code to approve: Documents verified, Manual identity match confirmed, Watchlist hit is a false positive',
+      'Choose a reason code to approve: Documents verified (docs_verified), Manual identity match confirmed (manual_match_confirmed), Watchlist hit is a false positive (watchlist_false_positive)',
     );
     expect((await action('u-alex', id, 'approve', { reasonCode: 'document_fraud' })).statusCode).toBe(400);
     expect((await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' })).json().status).toBe('approved');
