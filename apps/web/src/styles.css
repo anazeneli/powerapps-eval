@@ -42,6 +42,8 @@ main { padding: 20px 24px; max-width: 1280px; margin: 0 auto; }
 .hint { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
 .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 8px 12px; border-radius: 6px; }
 .ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 8px 12px; border-radius: 6px; }
+.notice { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; }
+.notice p { margin: 0 0 8px; }
 .link { background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font-size: inherit; font-family: inherit; }
 .case-header { display: flex; align-items: center; gap: 12px; margin: 12px 0 16px; }
 .columns { display: grid; grid-template-columns: 1fr 360px; gap: 16px; margin-bottom: 16px; }

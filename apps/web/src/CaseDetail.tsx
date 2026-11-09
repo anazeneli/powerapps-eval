@@ -27,7 +27,12 @@ const ACTION_LABELS: Record<CaseAction, string> = {
 export function CaseDetail({ me, users, id, onBack }: { me: User; users: User[]; id: string; onBack: () => void }) {
   const queryClient = useQueryClient();
   const caseQuery = useQuery({ queryKey: ['case', me.id, id], queryFn: () => get<KycCase>(`/cases/${id}`), staleTime: Infinity });
-  const audit = useQuery({ queryKey: ['audit', me.id, id], queryFn: () => get<AuditEvent[]>(`/cases/${id}/audit`) });
+  const [lostAccess, setLostAccess] = useState<CaseAction | null>(null);
+  const audit = useQuery({
+    queryKey: ['audit', me.id, id],
+    queryFn: () => get<AuditEvent[]>(`/cases/${id}/audit`),
+    enabled: !lostAccess,
+  });
   const [note, setNote] = useState('');
   const [reasonCode, setReasonCode] = useState('');
   const [revealed, setRevealed] = useState<string | null>(null);
@@ -36,8 +41,12 @@ export function CaseDetail({ me, users, id, onBack }: { me: User; users: User[];
   const act = useMutation({
     mutationFn: (action: CaseAction) =>
       post<KycCase>(`/cases/${id}/actions/${action}`, { note: note || undefined, reasonCode: reasonCode || undefined }),
-    onSuccess: (updated) => {
+    onSuccess: (updated, action) => {
       queryClient.setQueryData(['case', me.id, id], updated);
+      if (!can(me, 'case.view', updated).ok) {
+        setLostAccess(action);
+        queryClient.removeQueries({ queryKey: ['audit', me.id, id] });
+      }
       queryClient.invalidateQueries({ queryKey: ['audit'] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       setNote('');
@@ -150,6 +159,15 @@ export function CaseDetail({ me, users, id, onBack }: { me: User; users: User[];
 
         <div className="panel actions">
           <h2>Actions</h2>
+          {lostAccess && (
+            <div className="notice" data-testid="access-ended">
+              <p>
+                <b>{ACTION_LABELS[lostAccess]}</b> recorded in the audit trail. You no longer have access to this case
+                {c.status === 'escalated' ? ': it is now in the senior reviewer queue.' : '.'}
+              </p>
+              <button onClick={onBack}>Back to queue</button>
+            </div>
+          )}
           {c.riskLevel === 'high' && !['approved', 'rejected'].includes(c.status) && (
             <p className="hint">High-risk case: approval needs a second sign-off from a different senior reviewer.</p>
           )}
@@ -184,7 +202,7 @@ export function CaseDetail({ me, users, id, onBack }: { me: User; users: User[];
                 <button
                   key={action}
                   className={`action ${action}`}
-                  disabled={!d.ok || act.isPending}
+                  disabled={!d.ok || act.isPending || !!lostAccess}
                   title={d.ok ? '' : d.reason}
                   onClick={() => act.mutate(action)}
                 >
@@ -209,7 +227,13 @@ export function CaseDetail({ me, users, id, onBack }: { me: User; users: User[];
             <input type="checkbox" checked={showViews} onChange={(e) => setShowViews(e.target.checked)} /> Show views
           </label>
         </div>
-        <AuditTrail events={events} users={users} />
+        {lostAccess ? (
+          <p className="muted">Audit history is hidden because you no longer have access to this case.</p>
+        ) : audit.error ? (
+          <p className="error">{(audit.error as Error).message}</p>
+        ) : (
+          <AuditTrail events={events} users={users} />
+        )}
       </div>
     </section>
   );

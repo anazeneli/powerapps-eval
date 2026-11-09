@@ -148,7 +148,8 @@ function planPatch(user: User, c: KycCase, action: CaseActionName, input: Action
   };
   const requireCode = (codes: Record<string, string>) => {
     if (!input.reasonCode || !(input.reasonCode in codes)) {
-      throw new HttpError(400, `reasonCode must be one of: ${Object.keys(codes).join(', ')}`);
+      const verb = action === 'reject' ? 'reject' : 'approve';
+      throw new HttpError(400, `Choose a reason code to ${verb}: ${Object.values(codes).join(', ')}`);
     }
     return input.reasonCode;
   };

@@ -104,7 +104,11 @@ describe('decisions and four-eyes approval', () => {
   it('requires a valid reason code to approve or reject', async () => {
     const id = caseIdWhere("status = 'new' AND risk_level = 'low'");
     await action('u-alex', id, 'claim');
-    expect((await action('u-alex', id, 'approve')).statusCode).toBe(400);
+    const missing = await action('u-alex', id, 'approve');
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json().error).toBe(
+      'Choose a reason code to approve: Documents verified, Manual identity match confirmed, Watchlist hit is a false positive',
+    );
     expect((await action('u-alex', id, 'approve', { reasonCode: 'document_fraud' })).statusCode).toBe(400);
     expect((await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' })).json().status).toBe('approved');
   });
