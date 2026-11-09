@@ -22,9 +22,16 @@ export const platformRoutes = (db: DB) => async (app: FastifyInstance) => {
 export const auditRoutes = (db: DB) => async (app: FastifyInstance) => {
   requireApp(app, 'audit');
 
-  app.get<{ Querystring: { app?: string; limit?: string } }>('/', async (req) =>
-    listAudit(db, { appId: req.query.app || undefined, limit: Number(req.query.limit ?? 500) }),
-  );
+  app.get<{ Querystring: { app?: string; limit?: string; action?: string; since?: string } }>('/', async (req) => {
+    const { action, since } = req.query;
+    // A filtered query (e.g. a dashboard drill-down) returns every match; the unfiltered log is paged.
+    return listAudit(db, {
+      appId: req.query.app || undefined,
+      action: action || undefined,
+      since: since || undefined,
+      limit: action || since ? undefined : Number(req.query.limit ?? 500),
+    });
+  });
 
   app.get('/verify', async () => verifyChain(db));
 
