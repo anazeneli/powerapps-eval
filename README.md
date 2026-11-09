@@ -2,9 +2,11 @@
 
 Build-vs-buy evaluation of Microsoft Power Apps for a fintech's internal tooling. The repo has the research and a working prototype of the "build" option.
 
+> **Prototype, not a production system.** Login is mocked, all people, customers and SSNs are fictional, and the controls shown are design demonstrations, not a certified compliance implementation. The company scenario is illustrative: the figures are representative and don't describe any specific company.
+
 ## Problem scope
 
-A Series C fintech's VP of Engineering is deciding whether to **keep Microsoft Power Apps** for internal tools or **build an in-house internal-tools platform**.
+An illustrative growth-stage fintech's VP of Engineering is deciding whether to **keep Microsoft Power Apps** for internal tools or **build an in-house internal-tools platform**.
 
 - **Spend:** about **$250K/yr** on Power Apps. It's unclear how much is licenses vs. capacity, add-ons or people/partner time.
 - **Team:** about **60 engineers**. The number of non-engineer users (ops, compliance, support, finance) is unknown.
@@ -125,3 +127,18 @@ Open http://localhost:5173 and use the user switcher. Demo users:
 2. Alex tries again and is blocked.
 3. Sam approves it.
 4. Casey reviews the trail and verifies the hash chain.
+
+## How this was built
+
+Built end to end by [Devin](https://devin.ai) in one evening session, steered by one person: research, prototype, tests, UI review and fixes. The point is that a niche, compliance-heavy question (Power Apps licensing, Dataverse auditing, KYC/BSA retention, SOX change controls) can go from open question to a working, tested "build" option quickly.
+
+- **Time:** about 2 hours of wall-clock time from first prompt to the 3-app platform, with the person not at the keyboard the whole time.
+- **Cost:** about $11 of Devin usage for the research and build (observed by the requester mid-session; not a final billing figure).
+- **Sequence:** research brief ([#1](https://github.com/anazeneli/powerapps-eval/pull/1)) → KYC MVP ([#2](https://github.com/anazeneli/powerapps-eval/pull/2)) → Power Apps-style UI and dashboard ([#3](https://github.com/anazeneli/powerapps-eval/pull/3), [#4](https://github.com/anazeneli/powerapps-eval/pull/4)) → multi-app platform with Refunds and Feature Flags ([#5](https://github.com/anazeneli/powerapps-eval/pull/5)) → responsive fixes found by recorded UI tests ([#6](https://github.com/anazeneli/powerapps-eval/pull/6), [#7](https://github.com/anazeneli/powerapps-eval/pull/7)) → production plan ([#9](https://github.com/anazeneli/powerapps-eval/pull/9)).
+- **Per-app effort** fell as the shared platform took over; see the table in [Multi-app platform](#multi-app-platform).
+
+This is a prototype; getting to production is a separate, larger effort ([`docs/production-plan.md`](docs/production-plan.md)).
+
+## License
+
+[MIT](LICENSE)

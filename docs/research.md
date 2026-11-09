@@ -1,6 +1,6 @@
 # Power Apps: keep or build? Research brief
 
-**Context.** This brief was prepared for a Series C fintech. The VP of Engineering's team pays about **$250K/yr** for Power Apps. The company has 60 engineers; the number of non-engineer users is unknown. Three internal apps run on Power Apps today:
+**Context.** This brief uses an illustrative scenario: a growth-stage fintech (figures are representative, not any specific company's). The VP of Engineering's team pays about **$250K/yr** for Power Apps. The company has 60 engineers; the number of non-engineer users is unknown. Three internal apps run on Power Apps today:
 
 - a KYC review queue
 - a refunds dashboard
@@ -35,7 +35,7 @@ They plan to build about 10 more. Research date: November 2026. Prices are USD l
 
 ---
 
-## 1. Why a Series C fintech would use Power Apps
+## 1. Why a growth-stage fintech would use Power Apps
 
 ### Why it's chosen at this stage
 - **They're already a Microsoft shop.** Entra ID, Teams and Outlook are in place. Power Apps inherits SSO, MFA, Conditional Access and the existing joiner/mover/leaver process at no extra integration cost.
