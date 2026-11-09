@@ -97,7 +97,7 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
     return reply
       .header('content-type', 'text/csv; charset=utf-8')
       .header('content-disposition', 'attachment; filename="audit-log.csv"')
-      .send(toCsv(listAudit(db, { limit: 100000 })));
+      .send(toCsv(listAudit(db, { order: 'asc' })));
   });
 
   function viewableOrThrow(user: User, id: string) {

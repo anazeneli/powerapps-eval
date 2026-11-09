@@ -217,3 +217,50 @@ describe('dashboard stats', () => {
     expect(body).not.toMatch(/\d{3}-\d{2}-\d{4}|customerName|ssn"/);
   });
 });
+
+describe('review findings', () => {
+  const csv = async () => (await app.inject({ method: 'GET', url: '/api/audit.csv', headers: as('u-casey') })).body;
+
+  it('rejects inherited object keys as reason codes', async () => {
+    const id = caseIdWhere("status = 'new' AND risk_level = 'low'");
+    await action('u-alex', id, 'claim');
+    for (const reasonCode of ['constructor', 'toString', '__proto__']) {
+      expect((await action('u-alex', id, 'approve', { reasonCode })).statusCode).toBe(400);
+    }
+    expect((db.prepare('SELECT status FROM cases WHERE id = ?').get(id) as { status: string }).status).toBe('in_review');
+  });
+
+  it('an analyst loses access once their first approval hands the case on', async () => {
+    const id = caseIdWhere("status = 'new' AND risk_level = 'high'");
+    await action('u-alex', id, 'claim');
+    expect((await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' })).json().status).toBe('pending_second_approval');
+    expect((await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-alex') })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/api/cases/${id}`, headers: as('u-sam') })).statusCode).toBe(200);
+  });
+
+  it('exports the full audit log in ID order', async () => {
+    const lines = (await csv()).trim().split('\n');
+    const total = (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
+    expect(lines).toHaveLength(total + 1);
+    expect(lines[1].startsWith('1,')).toBe(true);
+  });
+
+  it('neutralises spreadsheet formulas in the CSV export', async () => {
+    const id = caseIdWhere("status = 'new'");
+    await action('u-alex', id, 'claim');
+    await action('u-alex', id, 'escalate', { note: '=HYPERLINK("http://evil.example","click")' });
+    const body = await csv();
+    expect(body).toContain(`"'=HYPERLINK(""http://evil.example"",""click"")"`);
+    expect(body).not.toMatch(/(^|,)=HYPERLINK/m);
+  });
+
+  it('detects events removed from the end of the chain', async () => {
+    expect(verifyChain(db).ok).toBe(true);
+    db.exec('DROP TRIGGER audit_events_no_delete');
+    db.prepare('DELETE FROM audit_events WHERE id = (SELECT MAX(id) FROM audit_events)').run();
+    const res = verifyChain(db);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/missing/);
+    expect(() => db.prepare('UPDATE audit_chain_head SET last_id = last_id - 1').run()).toThrow(/forward/);
+  });
+});

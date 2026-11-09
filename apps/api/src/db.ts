@@ -50,6 +50,20 @@ CREATE TABLE IF NOT EXISTS audit_events (
 );
 CREATE INDEX IF NOT EXISTS audit_events_entity ON audit_events(entity_type, entity_id);
 
+-- Chain head, written in the same transaction as each audit row. Lets verification detect a
+-- truncated tail. It only moves forward. Production would also anchor it in write-once storage.
+CREATE TABLE IF NOT EXISTS audit_chain_head (
+  id      INTEGER PRIMARY KEY CHECK (id = 1),
+  last_id INTEGER NOT NULL,
+  hash    TEXT NOT NULL,
+  count   INTEGER NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS audit_chain_head_forward_only BEFORE UPDATE ON audit_chain_head
+WHEN NEW.last_id <= OLD.last_id
+BEGIN SELECT RAISE(ABORT, 'audit chain head can only move forward'); END;
+CREATE TRIGGER IF NOT EXISTS audit_chain_head_no_delete BEFORE DELETE ON audit_chain_head
+BEGIN SELECT RAISE(ABORT, 'audit chain head cannot be deleted'); END;
+
 -- Append-only: nobody, including the app, can edit or delete audit history.
 CREATE TRIGGER IF NOT EXISTS audit_events_no_update BEFORE UPDATE ON audit_events
 BEGIN SELECT RAISE(ABORT, 'audit_events is append-only'); END;

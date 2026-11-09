@@ -111,7 +111,7 @@ export function can(user: User, action: Action, c?: CaseRef): Decision {
   switch (action) {
     case 'case.view':
       if (user.role !== 'analyst') return allow;
-      if (isAssignee || c.firstApproverId === user.id) return allow;
+      if (isAssignee) return allow;
       if (c.status === 'new' && c.assigneeId === null) return allow;
       return deny('Analysts can only open unassigned new cases or cases assigned to them');
 

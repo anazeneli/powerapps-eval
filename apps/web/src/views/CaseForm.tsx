@@ -123,7 +123,7 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
   const timer = useRef<number>();
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const caseQuery = useQuery({ queryKey: ['case', me.id, id], queryFn: () => get<KycCase>(`/cases/${id}`), staleTime: Infinity });
+  const caseQuery = useQuery({ queryKey: ['case', me.id, id], queryFn: () => get<KycCase>(`/cases/${id}`), staleTime: Infinity, refetchOnMount: 'always' });
   const audit = useQuery({
     queryKey: ['audit', me.id, id],
     queryFn: () => get<AuditEvent[]>(`/cases/${id}/audit`),
@@ -195,7 +195,12 @@ export function CaseForm({ me, users, id, onBack }: { me: User; users: User[]; i
         <MessageBar intent="success" className={s.msg} data-testid="access-ended">
           <MessageBarBody>
             <MessageBarTitle>{ACTION_LABELS[lostAccess]} recorded in the audit trail.</MessageBarTitle>
-            You no longer have access to this case{c.status === 'escalated' ? ': it is now in the senior reviewer queue.' : '.'}
+            You no longer have access to this case
+            {c.status === 'escalated'
+              ? ': it is now in the senior reviewer queue.'
+              : c.status === 'pending_second_approval'
+                ? ': it now needs a second approval from a different senior reviewer.'
+                : '.'}
           </MessageBarBody>
           <MessageBarActions>
             <Button onClick={onBack}>Back to queue</Button>

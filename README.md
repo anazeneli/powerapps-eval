@@ -40,6 +40,7 @@ What the research changed or sharpened (details in [`docs/research.md`](docs/res
 | 5 | **Stack: TypeScript throughout**: React + Vite frontend, a separate Fastify API, Postgres, Entra ID | Matches Power Apps code apps (React + Vite + TS), so the UI could also be published there. A separate API keeps audit and permission logic on the server. TypeScript is common on fintech teams; if their backend is Python or Go, swap only the API layer |
 | 6 | **First app: the KYC review queue**; refunds (Stripe test mode) second | The hardest, most compliance-heavy app is the decisive test of "build" |
 | 7 | **MVP scope: about a 2-hour build on SQLite with mocked login** | Shows the end-to-end flow and the compliance hooks without infrastructure |
+| 8 | **UI on Microsoft Fluent UI 2, laid out like a Power Apps model-driven app** | Fluent is the design system Power Apps, Dynamics and M365 use, so the build option looks like what staff use today and can be compared side by side. Clean enough for executives (dashboard), dense enough for analysts (grid, form, timeline) |
 
 Rough rebuild estimates (judgment, not benchmarks; see research §6):
 
@@ -52,12 +53,14 @@ Security review, compliance or sponsor-bank sign-off, and running both systems s
 ## The prototype: KYC review queue MVP
 
 **What it shows:**
-- A queue of identity-verification exceptions with SLA aging.
-- Case detail with SSN **masked by default**. Revealing it requires a justification and is logged.
+- A Power Apps-style shell: app header with mock sign-in, left navigation of saved views, command bars.
+- An **executive dashboard**: open cases, SLA breaches, time to decision, approval rate, four-eyes approvals, SSN reveals, plus charts. Numbers come from a read-only `/api/stats` endpoint, scoped to the cases the caller can see, with no customer data.
+- A sortable grid of identity-verification exceptions with SLA progress bars.
+- A case form with a stage bar (New → In review → 2nd approval → Closed), a timeline of the audit trail, and SSN **masked by default**. Revealing it requires a justification and is logged.
 - Claim, request info, escalate, approve or reject with a **required reason code**.
 - **Second-approver rule for high-risk cases**: the first approver can't give the second approval. The API and a database `CHECK` constraint both enforce it.
-- **Role- and row-level access** through one shared `can()` check. Analysts only see unassigned or their own cases; the compliance admin is read-only.
-- **Append-only audit log**: every change and every case view is written in the same transaction as the change. SQLite triggers block `UPDATE`/`DELETE`, and a SHA-256 hash chain makes tampering detectable. There's a per-case history, a global log for the compliance admin, and CSV export.
+- **Role- and row-level access** through one shared `can()` check. Analysts only see unassigned new cases or cases assigned to them (handing a case on, by escalating or giving the first approval, ends their access); the compliance admin is read-only.
+- **Append-only audit log**: every change and every case view is written in the same transaction as the change. SQLite triggers block `UPDATE`/`DELETE`, and a SHA-256 hash chain plus a forward-only chain head make edits, deletions and a truncated tail detectable. There's a per-case history, a global log for the compliance admin, and a full CSV export (spreadsheet formulas neutralised).
 
 **Mocked or out of scope:** real Entra login (a user switcher stands in), Postgres and row-level security, write-once archive, retention policy, the KYC vendor (seeded fake results), refunds/Stripe, deployment.
 
@@ -65,7 +68,7 @@ Security review, compliance or sponsor-bank sign-off, and running both systems s
 
 ```
 apps/api         Fastify + better-sqlite3: schema, seed, audit, permissions, KYC actions, tests
-apps/web         React + Vite + TanStack Query UI
+apps/web         React + Vite + TanStack Query + Fluent UI 2 (shell, dashboard, case grid, case form, audit log)
 packages/shared  Types, roles, reason codes and the can() permission check (used by API and UI)
 docs/            Research brief
 ```
@@ -78,14 +81,14 @@ Requires Node 22 (`.nvmrc`) and pnpm 9 (`corepack enable`).
 pnpm install
 pnpm dev          # API on :3001 (seeds data/kyc.sqlite on first run), web on :5173
 pnpm test         # API tests: permissions, second approver, audit integrity, SSN masking
-pnpm seed         # reset the database to the seed data
+pnpm seed         # reset the database to the seed data (run once after pulling schema changes)
 ```
 
 Open http://localhost:5173 and use the user switcher. Demo users:
 
 | User | Role | Can |
 |---|---|---|
-| Alex Rivera, Bea Okafor | Analyst | Claim new cases, work their own, give the first approval on high-risk cases |
+| Alex Rivera, Bea Okafor | Analyst | Claim new cases, work their own, give the first approval on high-risk cases (which hands the case on) |
 | Sam Chen, Riley Park | Senior reviewer | Everything an analyst can, plus escalated cases and the second approval |
 | Casey Morgan | Compliance admin | Read-only on cases; full audit log, chain verification, CSV export |
 

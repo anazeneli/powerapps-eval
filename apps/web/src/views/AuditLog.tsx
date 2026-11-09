@@ -40,7 +40,7 @@ export function AuditLog({ users, onOpenCase }: { users: User[]; onOpenCase: (id
   const [query, setQuery] = useState('');
   const [action, setAction] = useState('');
   const audit = useQuery({ queryKey: ['audit', 'all'], queryFn: () => get<AuditEvent[]>('/audit?limit=500') });
-  const verify = useMutation({ mutationFn: () => get<{ ok: boolean; count: number; brokenAtId: number | null }>('/audit/verify') });
+  const verify = useMutation({ mutationFn: () => get<{ ok: boolean; count: number; brokenAtId: number | null; reason?: string }>('/audit/verify') });
 
   const actions = useMemo(() => [...new Set((audit.data ?? []).map((e) => e.action))].sort(), [audit.data]);
   const q = query.trim().toLowerCase();
@@ -67,7 +67,7 @@ export function AuditLog({ users, onOpenCase }: { users: User[]; onOpenCase: (id
             <MessageBarTitle>{verify.data.ok ? 'Chain intact.' : 'Chain broken.'}</MessageBarTitle>
             {verify.data.ok
               ? `Chain intact: ${verify.data.count} events verified.`
-              : `Chain broken at event #${verify.data.brokenAtId}.`}
+              : `${verify.data.brokenAtId === null ? '' : `Chain broken at event #${verify.data.brokenAtId}. `}${verify.data.reason ?? ''}`}
           </MessageBarBody>
         </MessageBar>
       )}
