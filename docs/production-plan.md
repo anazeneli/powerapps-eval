@@ -28,6 +28,29 @@ Planning-grade estimate for taking the prototype (KYC, Refunds, Feature Flags on
 
 "With Devin" assumes engineers direct the work, review every PR and own decisions and sign-offs, while Devin writes the code, tests and infrastructure config. Coding-heavy work roughly halves; work bound by vendors, auditors or user testing barely moves. Devin usage (ACUs × the account's per-ACU rate) is a separate cost on top of engineer time.
 
+## Why a 2-hour prototype still needs months
+
+The prototype has the compliance *design*: one audited write path, one permission check per app, approval states in the data model. Production needs the *operational* version of those controls, and evidence that they work:
+
+- **Identity:** login is a user picker. Real SSO and deprovisioning depend on the company's Entra admins.
+- **Audit storage:** the log is a local SQLite file; anyone with disk access could rewrite it and recompute the hash chain. Auditors expect write-once storage, retention and backups.
+- **Data:** SSNs aren't encrypted at rest, and the KYC vendor and Stripe are simulated.
+- **Evidence:** SOX/SOC 2 needs change-approval records, access reviews and a pen test report, not just code.
+
+With Devin, coding is roughly 4–6 of the 12–19 engineer-weeks. The rest of the calendar is set by the pen test, security and compliance sign-off, vendor access, user testing and side-by-side running with Power Apps.
+
+## Faster path: phased rollout
+
+The totals above assume all three apps go live together and migrate history off Power Apps. Shipping one app at a time, lowest risk first, gets the first app to production in weeks. Calendar times assume Devin, 1–2 engineers, and reuse of existing cloud, CI/CD and Entra setup.
+
+| Phase | App | Why this order | Production-specific work | Calendar |
+|---|---|---|---|---|
+| 1 | Feature Flags | No PII, no money movement | Entra SSO and group mapping, Postgres, deploy pipeline, write-once audit archive, connection to the real flag system, internal security review | ~2–4 weeks |
+| 2 | Refunds | Money movement, but no identity data | Stripe integration and reconciliation, finance UAT, SOX change-management evidence | +3–5 weeks |
+| 3 | KYC Review | PII, BSA retention, examiner scrutiny | KYC vendor integration, SSN encryption, external pen test, 5-year retention, Dataverse history migration, compliance sign-off | +5–8 weeks |
+
+Phase 1 also builds the shared production platform (identity, data, audit archive, deploy), so phases 2 and 3 are mostly app-specific work. KYC still sets the overall end date: the full cutover lands around 2–3 months, but the first app reaches production in about a month and proves the platform before the high-risk app moves. New apps can start on the platform after phase 1, without waiting for the migration.
+
 ## Biggest risks to the estimate
 
 - KYC vendor and Stripe integration edge cases.
