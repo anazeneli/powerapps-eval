@@ -22,7 +22,7 @@ Questions the evaluation answers:
 
 > At about $250K/yr, Power Apps may cost more than it's worth for a 60-engineer team running 3 internal apps. With 10 more apps coming, an in-house platform might be cheaper and easier for the team to maintain, *if* the compliance and audit controls Power Apps provides can be rebuilt at reasonable cost.
 
-What the research changed or sharpened (details in [`docs/research.md`](docs/research.md)):
+What the research changed or sharpened (details in [`docs/research.md`](docs/research.md); production effort estimate in [`docs/production-plan.md`](docs/production-plan.md)):
 
 - **The $250K isn't licenses for the 60 engineers.** Those cost about $14K a year. The rest is likely non-engineer seats, Dataverse storage and add-ons, Power Automate, or partner/staff time. The line items decide the economics.
 - **The real value is the compliance scaffolding, not the screens.** Power Apps' database (Dataverse) provides field-level audit history, row- and field-level permissions, SSN masking and approvals. These only apply if the apps store data in Dataverse **with auditing switched on**, which is off by default with 30-day retention.
@@ -97,7 +97,7 @@ Demo people (mock login from the user menu):
 apps/api         Fastify + better-sqlite3: schema, seed, audit, permissions, KYC actions, tests
 apps/web         React + Vite + TanStack Query + Fluent UI 2 (shell, dashboard, case grid, case form, audit log)
 packages/shared  Types, roles, reason codes and the can() permission check (used by API and UI)
-docs/            Research brief
+docs/            Research brief, prototype-to-production plan
 ```
 
 ### Run it
