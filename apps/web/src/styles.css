@@ -4,4 +4,5 @@ body { background: #f3f2f1; }
 .fui-Badge { white-space: nowrap; flex-shrink: 0; }
 .table-scroll { overflow-x: auto; }
 .table-scroll > .fui-Table, .table-scroll > .fui-DataGrid { min-width: 820px; }
+.table-scroll > table.fui-Table { table-layout: auto; }
 .table-scroll .fui-TableCell { overflow-wrap: normal; }
