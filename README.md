@@ -108,6 +108,7 @@ Requires Node 22 (`.nvmrc`) and pnpm 9 (`corepack enable`).
 pnpm install
 pnpm dev          # API on :3001 (seeds data/kyc.sqlite on first run), web on :5173
 pnpm test         # API tests: permissions, second approver, audit integrity, SSN masking
+pnpm --filter @kyc/web test:ui   # every registered app at 1600/1280/900/700px: no sideways page scroll, no badge overflow, no collapsed columns (first run: pnpm --filter @kyc/web exec playwright install chromium)
 pnpm seed         # reset the database to the seed data (run once after pulling schema changes)
 ```
 

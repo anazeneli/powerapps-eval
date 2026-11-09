@@ -61,6 +61,7 @@ function RefundList({ filter, me, onOpen }: { filter: Filter; me: { id: string; 
         {canRefund(me, 'refund.create').ok && <Button appearance="primary" icon={<Add20Regular />} onClick={() => setCreating(true)} data-testid="new-refund">New refund</Button>}
       </PageHeader>
       <Surface>
+        <div className="table-scroll">
         <Table size="small" aria-label="Refunds" data-testid="refund-table">
           <TableHeader>
             <TableRow>
@@ -81,6 +82,7 @@ function RefundList({ filter, me, onOpen }: { filter: Filter; me: { id: string; 
             ))}
           </TableBody>
         </Table>
+        </div>
         {refunds.data?.length === 0 && <Text block style={{ padding: 16 }}>Nothing here.</Text>}
       </Surface>
       {creating && <NewRefundDialog onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />}

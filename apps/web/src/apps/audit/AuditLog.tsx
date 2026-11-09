@@ -34,6 +34,8 @@ const useStyles = makeStyles({
   count: { marginLeft: 'auto', color: tokens.colorNeutralForeground3 },
   muted: { color: tokens.colorNeutralForeground3 },
   msg: { marginBottom: '12px' },
+  table: { minWidth: '960px' },
+  details: { display: 'flex', flexDirection: 'column', gap: '4px', overflowWrap: 'anywhere' },
 });
 
 export function AuditLog({
@@ -117,17 +119,16 @@ export function AuditLog({
             <MessageBarBody>{(audit.error as Error).message}</MessageBarBody>
           </MessageBar>
         ) : (
-          <Table size="small" data-testid="audit-table" aria-label="Audit events">
+          <div className="table-scroll">
+          <Table size="small" className={s.table} data-testid="audit-table" aria-label="Audit events">
             <TableHeader>
               <TableRow>
-                <TableHeaderCell style={{ width: 56 }}>#</TableHeaderCell>
-                <TableHeaderCell style={{ width: 170 }}>When</TableHeaderCell>
-                <TableHeaderCell style={{ width: 220 }}>Who</TableHeaderCell>
-                <TableHeaderCell style={{ width: 220 }}>Action</TableHeaderCell>
-                <TableHeaderCell style={{ width: 110 }}>App</TableHeaderCell>
-                <TableHeaderCell style={{ width: 130 }}>Record</TableHeaderCell>
-                <TableHeaderCell>Changes</TableHeaderCell>
-                <TableHeaderCell>Reason</TableHeaderCell>
+                <TableHeaderCell style={{ width: 48 }}>#</TableHeaderCell>
+                <TableHeaderCell style={{ width: 150 }}>When</TableHeaderCell>
+                <TableHeaderCell style={{ width: 180 }}>Who</TableHeaderCell>
+                <TableHeaderCell style={{ width: 200 }}>Action</TableHeaderCell>
+                <TableHeaderCell style={{ width: 120 }}>Record</TableHeaderCell>
+                <TableHeaderCell>Changes and reason</TableHeaderCell>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,22 +144,28 @@ export function AuditLog({
                   <TableCell>
                     <TableCellLayout description={<span className="mono">{e.action}</span>}>{auditActionLabel(e)}</TableCellLayout>
                   </TableCell>
-                  <TableCell>{APPS.find((x) => x.id === e.appId)?.name ?? e.appId}</TableCell>
                   <TableCell>
-                    <Link className="mono" disabled={e.entityType !== 'case'} onClick={() => onOpenCase(e.entityId)}>
-                      {e.entityId}
-                    </Link>
+                    <TableCellLayout description={APPS.find((x) => x.id === e.appId)?.name ?? e.appId}>
+                      <Link className="mono" disabled={e.entityType !== 'case'} onClick={() => onOpenCase(e.entityId)}>
+                        {e.entityId}
+                      </Link>
+                    </TableCellLayout>
                   </TableCell>
                   <TableCell>
-                    <ChangeList e={e} users={users} />
-                  </TableCell>
-                  <TableCell>
-                    <Text size={200}>{e.reason}</Text>
+                    <div className={s.details}>
+                      <ChangeList e={e} users={users} />
+                      {e.reason && (
+                        <Text size={200} className={s.muted}>
+                          {e.reason}
+                        </Text>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </Surface>
     </section>

@@ -2,6 +2,7 @@ import {
   REFUND_REASON_CODES,
   REFUND_REJECT_CODES,
   canRefund,
+  formatMoney,
   needsSecondApproval,
   type AppSummary,
   type AppUser,
@@ -139,7 +140,7 @@ export function createRefund(db: DB, user: RefundUser, input: CreateRefundInput,
   return db.transaction(() => {
     const charge = listCharges(db).find((c) => c.id === input.chargeId);
     if (!charge) throw new HttpError(404, `Charge ${input.chargeId} not found`);
-    if (amount > charge.refundable) throw new HttpError(400, `Only ${charge.refundable} cents of this charge can still be refunded`);
+    if (amount > charge.refundable) throw new HttpError(400, `Only ${formatMoney(charge.refundable, charge.currency)} of this charge can still be refunded`);
     const { n } = db.prepare('SELECT COUNT(*) AS n FROM refunds').get() as { n: number };
     const id = `RF-${2001 + n}`;
     const now = new Date().toISOString();
