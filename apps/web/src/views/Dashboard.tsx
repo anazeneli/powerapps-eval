@@ -216,7 +216,7 @@ export default function Dashboard({
         <Kpi label="Awaiting 2nd approval" value={st.awaitingSecond} note="High-risk, four-eyes rule" onClick={show('second_approval')} />
         <Kpi label="Four-eyes approvals" value={st.fourEyesApprovals} note="Approved by two different reviewers" onClick={show('four_eyes')} />
         <Kpi label="SSN reveals (7 days)" value={st.ssnReveals7d} note="Each logged with a justification"
-          onClick={can(me, 'audit.view_all').ok ? () => onNavigate({ name: 'audit', action: 'case.ssn_revealed' }) : undefined}
+          onClick={can(me, 'audit.view_all').ok ? () => onNavigate({ name: 'audit', action: 'case.ssn_revealed', sinceDays: 7 }) : undefined}
         />
         <Kpi label="Escalated" value={st.byStatus.escalated} note="Waiting for a senior reviewer" onClick={show('escalated')} />
       </div>

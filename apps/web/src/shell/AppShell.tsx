@@ -39,7 +39,7 @@ export type View =
   | { name: 'dashboard' }
   | { name: 'grid'; filter: CaseFilter }
   | { name: 'case'; id: string; from: View }
-  | { name: 'audit'; action?: string };
+  | { name: 'audit'; action?: string; sinceDays?: number };
 
 const CASE_VIEWS: [CaseFilter, JSX.Element][] = [
   ['all', <DocumentBulletList20Regular />],

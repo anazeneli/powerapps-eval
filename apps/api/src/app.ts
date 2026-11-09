@@ -82,9 +82,11 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
     return listAudit(db, { entityType: 'case', entityId: req.params.id });
   });
 
-  app.get<{ Querystring: { limit?: string } }>('/api/audit', async (req) => {
+  app.get<{ Querystring: { limit?: string; action?: string; since?: string } }>('/api/audit', async (req) => {
     requireAuditAccess(req);
-    return listAudit(db, { limit: Number(req.query.limit ?? 500) });
+    const { action, since } = req.query;
+    // A filtered query (e.g. a dashboard drill-down) returns every match; the unfiltered log is paged.
+    return listAudit(db, { action, since, limit: action || since ? undefined : Number(req.query.limit ?? 500) });
   });
 
   app.get('/api/audit/verify', async (req) => {

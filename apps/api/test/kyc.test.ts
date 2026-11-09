@@ -357,3 +357,16 @@ describe('drill-down authorization', () => {
     expect((await app.inject({ method: 'GET', url: '/api/audit', headers: as('u-casey') })).statusCode).toBe(200);
   });
 });
+
+describe('audit drill-down', () => {
+  it('returns every matching event in the window, matching the dashboard count', async () => {
+    const id = caseIdWhere("status = 'new'");
+    await action('u-sam', id, 'claim');
+    await app.inject({ method: 'POST', url: `/api/cases/${id}/reveal-ssn`, headers: as('u-sam'), payload: { justification: 'Check' } });
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const events = (await app.inject({ method: 'GET', url: `/api/audit?action=case.ssn_revealed&since=${encodeURIComponent(since)}`, headers: as('u-casey') })).json() as { action: string; at: string }[];
+    const stats = (await app.inject({ method: 'GET', url: '/api/stats', headers: as('u-casey') })).json();
+    expect(events).toHaveLength(stats.ssnReveals7d);
+    expect(events.every((e) => e.action === 'case.ssn_revealed' && e.at >= since)).toBe(true);
+  });
+});

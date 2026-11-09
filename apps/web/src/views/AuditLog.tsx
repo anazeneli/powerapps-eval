@@ -38,16 +38,20 @@ const useStyles = makeStyles({
 export function AuditLog({
   users,
   initialAction,
+  sinceDays,
   onOpenCase,
 }: {
   users: User[];
   initialAction?: string;
+  sinceDays?: number;
   onOpenCase: (id: string) => void;
 }) {
   const s = useStyles();
   const [query, setQuery] = useState('');
   const [action, setAction] = useState(initialAction ?? '');
-  const audit = useQuery({ queryKey: ['audit', 'all'], queryFn: () => get<AuditEvent[]>('/audit?limit=500') });
+  const [since] = useState(() => (sinceDays ? new Date(Date.now() - sinceDays * 86_400_000).toISOString() : null));
+  const scope = initialAction && since ? `?action=${encodeURIComponent(initialAction)}&since=${encodeURIComponent(since)}` : '?limit=500';
+  const audit = useQuery({ queryKey: ['audit', 'all', scope], queryFn: () => get<AuditEvent[]>(`/audit${scope}`) });
   const verify = useMutation({ mutationFn: () => get<{ ok: boolean; count: number; brokenAtId: number | null; reason?: string }>('/audit/verify') });
 
   const actions = useMemo(() => [...new Set((audit.data ?? []).map((e) => e.action))].sort(), [audit.data]);

@@ -51,7 +51,7 @@ export function App() {
       ) : view.name === 'case' ? (
         <CaseForm key={view.id} me={me} users={users.data} id={view.id} onBack={() => navigate(view.from)} />
       ) : (
-        <AuditLog key={view.action ?? ''} users={users.data} initialAction={view.action} onOpenCase={openCase} />
+        <AuditLog key={`${view.action ?? ''}:${view.sinceDays ?? ''}`} users={users.data} initialAction={view.action} sinceDays={view.sinceDays} onOpenCase={openCase} />
       )}
     </AppShell>
   );
