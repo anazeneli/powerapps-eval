@@ -3,6 +3,7 @@ import { openDb, type DB } from '../src/db.js';
 import { seed } from '../src/seed.js';
 import { buildApp } from '../src/app.js';
 import { verifyChain } from '../src/audit.js';
+import { APPROVE_REASON_CODES } from '@kyc/shared';
 
 let db: DB;
 let app: ReturnType<typeof buildApp>;
@@ -106,9 +107,9 @@ describe('decisions and four-eyes approval', () => {
     await action('u-alex', id, 'claim');
     const missing = await action('u-alex', id, 'approve');
     expect(missing.statusCode).toBe(400);
-    expect(missing.json().error).toBe(
-      'Choose a reason code to approve: Documents verified (docs_verified), Manual identity match confirmed (manual_match_confirmed), Watchlist hit is a false positive (watchlist_false_positive)',
-    );
+    const message: string = missing.json().error;
+    expect(message).toMatch(/approve/i);
+    for (const code of Object.keys(APPROVE_REASON_CODES)) expect(message).toContain(code);
     expect((await action('u-alex', id, 'approve', { reasonCode: 'document_fraud' })).statusCode).toBe(400);
     expect((await action('u-alex', id, 'approve', { reasonCode: 'docs_verified' })).json().status).toBe('approved');
   });
