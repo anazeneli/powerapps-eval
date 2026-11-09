@@ -100,7 +100,9 @@ describe('refunds', () => {
 
   it('cannot refund more than what is left on the charge, and rejections need a reason code', async () => {
     const c = charge(13);
-    expect((await create('u-jordan', 1_501, c)).statusCode).toBe(400);
+    const over = await create('u-jordan', 1_501, c);
+    expect(over.statusCode).toBe(400);
+    expect(over.json().error).toMatch(/Only \$15\.00 of this charge/);
     const r = (await create('u-jordan', 1_000, c)).json();
     expect((await create('u-jordan', 600, c)).statusCode).toBe(400);
     expect((await post('u-sam', `/api/refunds/${r.id}/reject`, { reasonCode: 'constructor' })).statusCode).toBe(400);

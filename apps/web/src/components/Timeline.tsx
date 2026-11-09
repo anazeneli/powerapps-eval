@@ -33,11 +33,18 @@ export function ChangeList({ e, users }: { e: AuditEvent; users: Named[] }) {
   if (!e.changes || Object.keys(e.changes).length === 0) return null;
   return (
     <div className={s.changes}>
-      {Object.entries(e.changes).map(([field, { from, to }]) => (
-        <Text key={field} size={200}>
-          <span className={s.muted}>{fieldLabel(field)}:</span> {formatValue(field, from, users)} → <b>{formatValue(field, to, users)}</b>
-        </Text>
-      ))}
+      {Object.entries(e.changes).map(([field, { from, to }]) =>
+        Array.isArray(to) ? (
+          <Text key={field} size={200} title={to.join(', ')}>
+            <span className={s.muted}>{fieldLabel(field)}:</span> <b>{to.length} records</b>
+            {to.length > 0 && ` (${to.slice(0, 3).join(', ')}${to.length > 3 ? ` +${to.length - 3} more` : ''})`}
+          </Text>
+        ) : (
+          <Text key={field} size={200}>
+            <span className={s.muted}>{fieldLabel(field)}:</span> {formatValue(field, from, users)} → <b>{formatValue(field, to, users)}</b>
+          </Text>
+        ),
+      )}
     </div>
   );
 }
