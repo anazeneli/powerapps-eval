@@ -3,6 +3,10 @@ import { openDb, type DB } from '../src/platform/db.js';
 import { seed } from '../src/seed.js';
 import { buildApp } from '../src/app.js';
 import { verifyChain } from '../src/platform/audit.js';
+import { can, type KycCase, type User } from '@kyc/shared';
+import { PEOPLE } from '../src/seed.js';
+
+const USERS: User[] = PEOPLE.filter((p) => p.roles.kyc).map((p) => ({ id: p.id, name: p.name, role: p.roles.kyc as User['role'] }));
 import { APPROVE_REASON_CODES } from '@kyc/shared';
 
 let db: DB;
@@ -263,5 +267,92 @@ describe('review findings', () => {
     expect(res.ok).toBe(false);
     expect(res.reason).toMatch(/missing/);
     expect(() => db.prepare('UPDATE audit_chain_head SET last_id = last_id - 1').run()).toThrow(/forward/);
+  });
+});
+
+describe('dashboard drill-down filters', () => {
+  const list = async (filter: string, userId = 'u-sam') =>
+    (await app.inject({ method: 'GET', url: `/api/kyc/cases?filter=${filter}`, headers: as(userId) })).json() as {
+      status: string;
+      riskLevel: string;
+      createdAt: string;
+      secondApproverId: string | null;
+    }[];
+  const closed = (s: string) => s === 'approved' || s === 'rejected';
+
+  it('each KPI filter returns only matching cases and agrees with the stats', async () => {
+    const stats = (await app.inject({ method: 'GET', url: '/api/kyc/stats', headers: as('u-sam') })).json();
+    const open = await list('open');
+    expect(open).toHaveLength(stats.open);
+    expect(open.every((c) => !closed(c.status))).toBe(true);
+
+    const overdue = await list('overdue');
+    expect(overdue).toHaveLength(stats.slaBreaches);
+    expect(overdue.every((c) => !closed(c.status) && Date.now() - Date.parse(c.createdAt) >= 48 * 3_600_000)).toBe(true);
+
+    expect(await list('four_eyes')).toHaveLength(stats.fourEyesApprovals);
+    expect((await list('four_eyes')).every((c) => c.secondApproverId)).toBe(true);
+    expect((await list('decided_7d')).every((c) => closed(c.status))).toBe(true);
+    expect((await list('in_review')).every((c) => c.status === 'in_review')).toBe(true);
+    for (const r of ['low', 'medium', 'high']) {
+      const cases = await list(`risk_${r}`);
+      expect(cases).toHaveLength(stats.byRisk[r]);
+      expect(cases.every((c) => c.riskLevel === r)).toBe(true);
+    }
+  });
+
+  it('drill-down lists still apply row-level access', async () => {
+    const stats = (await app.inject({ method: 'GET', url: '/api/kyc/stats', headers: as('u-alex') })).json();
+    expect(await list('open', 'u-alex')).toHaveLength(stats.open);
+  });
+});
+
+describe('drill-down authorization', () => {
+  const FILTERS = ['all', 'new', 'mine', 'in_review', 'pending_info', 'escalated', 'second_approval', 'closed', 'open', 'overdue', 'decided_7d', 'four_eyes', 'risk_low', 'risk_medium', 'risk_high'];
+  const auditCount = () => (db.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n;
+
+  it('every filtered list, for every role, contains only cases that role may open', async () => {
+    for (const user of USERS as User[]) {
+      for (const filter of FILTERS) {
+        const res = await app.inject({ method: 'GET', url: `/api/kyc/cases?filter=${filter}`, headers: as(user.id) });
+        expect(res.statusCode).toBe(200);
+        for (const c of res.json() as KycCase[]) {
+          expect(can(user, 'case.view', c).ok, `${user.id} saw ${c.id} via ${filter}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('analysts never see another analyst\'s cases through any filter', async () => {
+    for (const filter of FILTERS) {
+      const cases = (await app.inject({ method: 'GET', url: `/api/kyc/cases?filter=${filter}`, headers: as('u-alex') })).json() as KycCase[];
+      for (const c of cases) expect(c.assigneeId === 'u-alex' || (c.status === 'new' && c.assigneeId === null)).toBe(true);
+    }
+  });
+
+  it('listing does not leak SSNs or write audit rows; opening a case from a list is logged', async () => {
+    const n = auditCount();
+    const body = (await app.inject({ method: 'GET', url: '/api/kyc/cases?filter=open', headers: as('u-sam') })).body;
+    expect(body).not.toMatch(/"ssn"|\d{3}-\d{2}-\d{4}/);
+    expect(auditCount()).toBe(n);
+    const id = caseIdWhere("status = 'new'");
+    await app.inject({ method: 'GET', url: `/api/kyc/cases/${id}`, headers: as('u-sam') });
+    expect(auditFor(id).at(-1)).toMatchObject({ action: 'case.viewed', actor_id: 'u-sam' });
+  });
+
+  it('a denied case open returns 403 and writes nothing', async () => {
+    const beas = caseIdWhere("assignee_id = 'u-bea'");
+    const n = auditCount();
+    expect((await app.inject({ method: 'GET', url: `/api/kyc/cases/${beas}`, headers: as('u-alex') })).statusCode).toBe(403);
+    expect(auditCount()).toBe(n);
+  });
+
+  it('the SSN-reveal drill-down target (audit log) is compliance-admin only, on every audit endpoint', async () => {
+    for (const userId of ['u-alex', 'u-bea', 'u-sam', 'u-riley']) {
+      for (const url of ['/api/audit', '/api/audit/verify', '/api/audit/export.csv']) {
+        expect((await app.inject({ method: 'GET', url, headers: as(userId) })).statusCode, `${userId} ${url}`).toBe(403);
+      }
+    }
+    expect((await app.inject({ method: 'GET', url: '/api/audit', headers: as('u-casey') })).statusCode).toBe(200);
   });
 });

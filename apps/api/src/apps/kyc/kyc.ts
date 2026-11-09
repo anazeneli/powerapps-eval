@@ -1,6 +1,7 @@
 import {
   APPROVE_REASON_CODES,
   REJECT_REASON_CODES,
+  SLA_HOURS,
   can,
   maskSsn,
   type Action,
@@ -72,10 +73,28 @@ function authorize(user: User, action: Action, c?: KycCase): void {
   if (!d.ok) throw new HttpError(403, d.reason);
 }
 
-export const CASE_FILTERS = ['all', 'new', 'mine', 'pending_info', 'escalated', 'second_approval', 'closed'] as const;
+export const CASE_FILTERS = [
+  'all',
+  'new',
+  'mine',
+  'in_review',
+  'pending_info',
+  'escalated',
+  'second_approval',
+  'closed',
+  'open',
+  'overdue',
+  'decided_7d',
+  'four_eyes',
+  'risk_low',
+  'risk_medium',
+  'risk_high',
+] as const;
 export type CaseFilter = (typeof CASE_FILTERS)[number];
 
-export function listCases(db: DB, user: User, filter: CaseFilter = 'all'): KycCase[] {
+const closed = (c: KycCase) => c.status === 'approved' || c.status === 'rejected';
+
+export function listCases(db: DB, user: User, filter: CaseFilter = 'all', now = Date.now()): KycCase[] {
   const rows = db.prepare('SELECT * FROM cases ORDER BY created_at ASC').all() as CaseRow[];
   return rows
     .map(toCase)
@@ -95,7 +114,21 @@ export function listCases(db: DB, user: User, filter: CaseFilter = 'all'): KycCa
         case 'second_approval':
           return c.status === 'pending_second_approval';
         case 'closed':
-          return c.status === 'approved' || c.status === 'rejected';
+          return closed(c);
+        case 'in_review':
+          return c.status === 'in_review';
+        case 'open':
+          return !closed(c);
+        case 'overdue':
+          return !closed(c) && now - Date.parse(c.createdAt) >= SLA_HOURS * 3_600_000;
+        case 'decided_7d':
+          return closed(c) && now - Date.parse(c.updatedAt) <= 7 * 86_400_000;
+        case 'four_eyes':
+          return c.secondApproverId !== null;
+        case 'risk_low':
+        case 'risk_medium':
+        case 'risk_high':
+          return c.riskLevel === filter.slice(5);
       }
     });
 }

@@ -35,10 +35,18 @@ const useStyles = makeStyles({
   msg: { marginBottom: '12px' },
 });
 
-export function AuditLog({ users, onOpenCase }: { users: User[]; onOpenCase: (id: string) => void }) {
+export function AuditLog({
+  users,
+  initialAction,
+  onOpenCase,
+}: {
+  users: User[];
+  initialAction?: string;
+  onOpenCase: (id: string) => void;
+}) {
   const s = useStyles();
   const [query, setQuery] = useState('');
-  const [action, setAction] = useState('');
+  const [action, setAction] = useState(initialAction ?? '');
   const audit = useQuery({ queryKey: ['audit', 'all'], queryFn: () => get<AuditEvent[]>('/audit?limit=500') });
   const verify = useMutation({ mutationFn: () => get<{ ok: boolean; count: number; brokenAtId: number | null; reason?: string }>('/audit/verify') });
 
@@ -62,7 +70,7 @@ export function AuditLog({ users, onOpenCase }: { users: User[]; onOpenCase: (id
       </PageHeader>
 
       {verify.data && (
-        <MessageBar intent={verify.data.ok ? 'success' : 'error'} className={s.msg} data-testid="verify-result">
+        <MessageBar layout="multiline" intent={verify.data.ok ? 'success' : 'error'} className={s.msg} data-testid="verify-result">
           <MessageBarBody>
             <MessageBarTitle>{verify.data.ok ? 'Chain intact.' : 'Chain broken.'}</MessageBarTitle>
             {verify.data.ok
@@ -71,7 +79,7 @@ export function AuditLog({ users, onOpenCase }: { users: User[]; onOpenCase: (id
           </MessageBarBody>
         </MessageBar>
       )}
-      <MessageBar intent="info" className={s.msg}>
+      <MessageBar layout="multiline" intent="info" className={s.msg}>
         <MessageBarBody>
           The database rejects updates and deletes on this table, and each event's hash covers the previous one, so edits are detectable.
         </MessageBarBody>
@@ -95,7 +103,7 @@ export function AuditLog({ users, onOpenCase }: { users: User[]; onOpenCase: (id
         {audit.isLoading ? (
           <Spinner />
         ) : audit.error ? (
-          <MessageBar intent="error">
+          <MessageBar layout="multiline" intent="error">
             <MessageBarBody>{(audit.error as Error).message}</MessageBarBody>
           </MessageBar>
         ) : (
