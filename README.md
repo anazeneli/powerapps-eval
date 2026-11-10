@@ -40,6 +40,10 @@ Each new app reuses the shell, access checks, audit log and approval patterns, s
 
 **Mocked or out of scope:** Entra ID login, Postgres with row-level security, write-once audit archive and retention, the KYC vendor, Stripe, deployment. See the production plan.
 
+## Status
+
+All pull requests ([#1–#12](https://github.com/anazeneli/powerapps-eval/pulls?q=is%3Apr+is%3Aclosed)) are merged to `main`, and on `main` the 47 API tests, type checks and the responsive layout check pass.
+
 ## Run it
 
 Requires Node 22 (`.nvmrc`) and pnpm 9 (`corepack enable`).
